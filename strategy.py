@@ -1,0 +1,686 @@
+import sqlite3
+import time
+import random
+import datetime
+import json
+import pandas as pd
+from typing import List, Dict, Union
+import utils
+from path import INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, CONDITION_TABLE
+
+class Strategy:
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def generate_ROE_test_conditions(strategy: str, items: int = 10) -> List[Dict]:
+        """
+        生成测试条件列表,用于测试策略
+        :param strategy: 策略名称, 例如: 'roe', 'roe-dividend', 'roe-mos'
+        :param items: 生成的测试条件数量, 例如: 10
+        :return: 测试条件列表
+        """
+        # 检查参数
+        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS']:
+            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS)')
+        if not 100 >= items >= 1:
+            raise ValueError('请检查items参数是否正确(1 <= items <= 100)')
+
+        condition = []  # 定义返回值
+        if strategy.upper() == 'ROE':
+            for item in range(items):
+                roe_value = random.randint(10, 40)
+                period = random.randint(5, 10)
+                tmp =  {
+                    'strategy': strategy.upper(), 
+                    'test_condition': {
+                        'roe_list': [],  
+                        'roe_value': roe_value, 
+                        'period': period
+                    }
+                }
+                condition.append(tmp)
+        elif strategy.upper() == 'ROE-MOS':
+            for item in range(items):
+                roe_value = random.randint(10, 40)
+                # 生成两个元素的列表,第二个要大于第一个,且两个元素都处于[0.2, 1]之间
+                mos_range = [round(random.uniform(0.2, 1), 4), round(random.uniform(0.2, 1), 4)]
+                mos_range.sort()
+                tmp =  {
+                    'strategy': strategy.upper(), 
+                    'test_condition': {
+                        'roe_list': [roe_value]*7, 
+                        'mos_range': mos_range
+                    }
+                }
+                condition.append(tmp)
+        elif strategy.upper() == 'ROE-DIVIDEND':
+            for item in range(items):
+                roe_value = random.randint(10, 40)
+                period = random.randint(5, 10)
+                roe_list = [roe_value]*period
+                dividend = random.randint(0, 10)
+                tmp =  {
+                    'strategy': strategy.upper(),
+                    'test_condition': {
+                        'roe_list': roe_list,
+                        'period': period,
+                        'dividend': dividend
+                    }
+                }
+                condition.append(tmp)
+        return condition
+
+    def test_strategy_portfolio(
+        self, 
+        strategy: str, 
+        result: Dict, 
+        index_list: List = ['000300', '399006', '000905'], 
+        days: int = 183
+    ) -> Union[str, Dict]:
+        """
+        对选股策略的测试结果进行初步测试,生成该测试结果每个时间组股票组合的收益率和指定指数的收益率,即测试结果和指数的收益对比.
+        :param strategy:选股策略名称,目前支持'ROE','PE-PB','ROE-DIVIDEND','ROE-MOS'.
+        :param result:策略类方法的返回值,即测试条件相对应的测试结果.
+        :param index_list:指定测试的指数,默认为沪深300(000300),创业板指(399006),中证500(000905),最多为3个指数.
+        :param days:指定非ROE-...型策略中回测的时间间隔,即持有此组合的天数,默认为183天.
+        :return:返回值为字典,键为时间组(和result参数时间组相同),值为该时间组的选股组合和指定指数的收益率.
+        NOTE:为了减轻计算压力,如果result参数时间组平均数量大于25,或者全部时间组选股数量合计大于288,直接返回定制的测试结果
+        """
+        # 检查参数
+        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS']:
+            raise ValueError('请检查策略名称是否正确')
+        if not all([item in ['000300', '399006', '000905'] for item in index_list]):
+            raise ValueError('请检查指数代码是否正确')
+        test_result = {date: [] for date in result.keys()}  # 定义返回值
+
+        if sum([len(item) for item in result.values()])/len(result) > 25 or \
+            sum([len(item) for item in result.values()]) > 288:
+            print('测试结果股票数量过多,为减轻计算压力,返回定制的结果')
+            return {date: [0, 0] for date in result.keys()}
+        
+        for date, stocks in sorted(result.items(), key=lambda x: x[0]):  # 对每个时间组的选股结果进行回测
+            code_list = [item[0][0:6] for item in stocks]  # 不含后缀
+            if strategy.upper() in ['ROE', 'ROE-PE-PB', 'ROE-MOS', 'ROE-DIVIDEND']:  # roe type strategy
+                start_date = str(int(date[1:5])+1)+'-06-01'
+                end_date = str(int(date[1:5])+2)+'-06-01'
+            else:
+                start_date = date
+                end_date_tmp = datetime.datetime.strptime(date, '%Y-%m-%d') + datetime.timedelta(days=days)
+                end_date = end_date_tmp.strftime('%Y-%m-%d')
+            stock_return = utils.calculate_portfolio_rising_value(code_list, start_date, end_date)  # 获取组合的收益率
+            test_result[date].append(stock_return)
+            if index_list:  # 获取指数的收益率
+                for index in index_list:
+                    index_return = utils.calculate_index_rising_value(index, start_date, end_date)
+                    test_result[date].append(index_return)
+        return test_result
+
+    def evaluate_portfolio_effect(
+        self, 
+        test_condition: Dict, 
+        test_result: Dict, 
+        portfolio_test_result: Dict
+    ) -> Dict:
+        """
+        对测试结果和指数的收益对比进行综合评估,根据评估结果对测试条件加以储存和动态调整.
+        评估方法: 对某个测试结果中每个时间组的组合和指数的收益率对比,并计算该测试结果的内在收益率.
+        某个测试结果战胜000300指数的比例为则basic_ration基本比率为0.如某个结果共10个有效时间组(valid_groups),战胜000300指数的次数为8次,
+        则basic_ration为0.8.选股组合的inner_rate内在收益率为各有效时间组组合总收益的复合收益率.
+        计算basic_ratio和inner_rate均使用有效时间组(valid_groups),即该时间组包含的股票数在5至25之间.(2023-04-16)
+        :param test_condition: 测试条件,结构为{'strategy': 'ROE', 'test_condition': {...}}.
+        :param test_result: 测试结果,策略类方法的返回值.
+        :param portfolio_test_result: 测试结果和指数的收益对比,test_strategy_portfolio的返回值.(2023-04-17)
+        返回值为字典,字典键为测试条件,值为该测试条件的评估结果,结构为{'basic_ratio': 0.8, 'inner_rate': 0.1,...}. (2023-04-17)
+        增加了测试条件的综合评分项目.(2023-04-25)
+        """
+        evaluate_result = {}  # 定义返回值
+
+        evaluate_result['strategy'] = test_condition['strategy']
+        evaluate_result['test_condition'] = test_condition['test_condition']
+        # total_groups = len([date for date, stocks in test_result.items() if stocks])  # 获取总时间组数,不含空代码集合
+        total_groups = len(test_result.keys())  # 获取总时间组数目,包含空代码集合
+        evaluate_result['total_groups'] = total_groups
+
+        # 获取有效时间组
+        valid_groups = {date: stocks for date, stocks in test_result.items() if 5 <= len(stocks) <= 25}
+        evaluate_result['valid_groups'] = len(valid_groups)
+        evaluate_result['valid_percent'] = round(len(valid_groups) / total_groups, 4)
+
+        # 获取有效时间组的键名
+        valid_groups_keys = list(valid_groups.keys())
+        evaluate_result['valid_groups_keys'] = valid_groups_keys
+
+        # 计算basic_ratio
+        win_count = 0
+        for date, stocks in valid_groups.items():
+            if portfolio_test_result[date][0] > portfolio_test_result[date][1]:
+                win_count += 1
+        basic_ratio = win_count / len(valid_groups) if valid_groups else 0
+        evaluate_result['basic_ratio'] = round(basic_ratio, 4)
+
+        # 计算inner_rate TODO 当时间组间隔不等于1年的情况下,是否需要调整？
+        total_return = 1
+        for date, stocks in valid_groups.items():
+            total_return *= (1 + portfolio_test_result[date][0])
+        inner_rate = total_return ** (1 / len(valid_groups)) - 1 if valid_groups else 0
+        evaluate_result['inner_rate'] = round(inner_rate, 4)
+
+        # 调用get_score_of_test_condition计算综合评分score
+        score = self.get_score_of_test_condition(
+            evaluate_result['inner_rate'], evaluate_result['valid_percent'], evaluate_result['basic_ratio']
+        )
+        evaluate_result['score'] = score
+
+        # 添加日期
+        evaluate_result['date'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+        return evaluate_result
+
+    def save_strategy_to_sqlite3(
+        self, 
+        evaluate_result: Dict,
+        sqlite_file: str = TEST_CONDITION_SQLITE3,
+        table_name: str = CONDITION_TABLE
+        ) -> None:
+        """
+        如某个结果综合得分超过80分且valid_percent大于25%,则储存该组合的测试条件和相关评估信息到数据库.
+        数据库内容:strategy、test_condition、total_groups(总时间组数目)、valid_groups(有效时间组数目)、
+        valid_percent(有效时间组占比)、valid_groups_keys(有效时间组清单)、basci_ratio(对000300的胜率)
+        和inner_rate(内在收益率).(2023-04-16)
+        :param evaluate_result: 测试结果和指数收益对比的评估结果的返回值. 
+        :param sqlite_file: 目标数据库文件路径,默认为TEST_CONDITION_SQLITE3.
+        :param table_name: 目标数据库表名,默认为CONDITION_TABLE.
+        :return: None
+        NOTE:综合得分低于80分或者valid_percent小于0.25,不保存返回
+        """
+        if evaluate_result['score'] < 80 or evaluate_result['valid_percent'] < 0.25:
+            return
+        # 在tmp-file文件夹下创建数据库文件,文件名为test-condition.sqlite3
+        conn = sqlite3.connect(sqlite_file)
+        with conn:
+            # 创建表,要求以stratrgy和test_condition为主键
+            sql = f"""
+                CREATE TABLE IF NOT EXISTS '{table_name}'
+                (
+                    strategy TEXT, 
+                    test_condition TEXT, 
+                    total_groups INTEGER, 
+                    valid_groups INTEGER, 
+                    valid_percent REAL, 
+                    valid_groups_keys TEXT, 
+                    basic_ratio REAL, 
+                    inner_rate REAL, 
+                    score REAL, 
+                    date TEXT,
+                    PRIMARY KEY(strategy, test_condition)
+                )
+            """
+            conn.execute(sql)
+
+            sql = f"""
+                INSERT OR REPLACE INTO '{table_name}'
+                (
+                    strategy,
+                    test_condition,
+                    total_groups,
+                    valid_groups,
+                    valid_percent,
+                    valid_groups_keys,
+                    basic_ratio,
+                    inner_rate,
+                    score,
+                    date
+                )
+                VALUES
+                (
+                    '{evaluate_result['strategy']}',
+                    '{json.dumps(evaluate_result['test_condition'])}',
+                    {evaluate_result['total_groups']},
+                    {evaluate_result['valid_groups']},
+                    {evaluate_result['valid_percent']},
+                    '{json.dumps(evaluate_result['valid_groups_keys'])}',
+                    {evaluate_result['basic_ratio']},
+                    {evaluate_result['inner_rate']},
+                    {evaluate_result['score']},
+                    '{evaluate_result['date']}'
+                )
+            """
+            conn.execute(sql)
+            print('保存测试条件到数据库成功!')
+
+    @staticmethod
+    def get_score_of_test_condition(inner_rate: float, valid_percent: float, basic_ratio: float) -> float:
+        """
+        - 获取测试条件的评分,综合评分规则为:basic_ratio*0.35+inner_rate*0.6+valid_percent*0.05.
+        - inner_rate valid_percent basic_ratio最大得分均为100分.单项评分如下:
+        - inner_rate: [0.25-]:100分, [0.2-0.25]:90分, [0.15-0.2]:80分, [0.1-0.15]:70分, [0.06-0.1]:60分
+        - valid_percent: [0.7-]:100分, [0.6-0.7]:90分, [0.5-0.6]:80分, [0.4-0.5]:70分, [0.3-0.4]:60分
+        - basic_ratio: [0.85-]:100分, [0.8-0.85]:90分, [0.75-0.8]:80分, [0.7-0.75]:70分, [0.6-0.7]:60分
+        :param inner_rate: 内在收益率
+        :param valid_percent: 有效时间组占比
+        :param basic_ratio: 对000300的胜率
+        :return: 测试条件的评分
+        """
+        # 计算inner_rate的评分
+        if inner_rate >= 0.25:
+            inner_rate_score = 100
+        elif inner_rate >= 0.2:
+            inner_rate_score = 90
+        elif inner_rate >= 0.15:
+            inner_rate_score = 80
+        elif inner_rate >= 0.1:
+            inner_rate_score = 70
+        elif inner_rate >= 0.06:
+            inner_rate_score = 60
+        else:
+            inner_rate_score = 0
+
+        # 计算valid_percent的评分
+        if valid_percent >= 0.7:
+            valid_percent_score = 100
+        elif valid_percent >= 0.6:
+            valid_percent_score = 90
+        elif valid_percent >= 0.5:
+            valid_percent_score = 80
+        elif valid_percent >= 0.4:
+            valid_percent_score = 70
+        elif valid_percent >= 0.3:
+            valid_percent_score = 60
+        else:
+            valid_percent_score = 0
+        
+        # 计算basic_ratio的评分
+        if basic_ratio >= 0.85:
+            basic_ratio_score = 100
+        elif basic_ratio >= 0.8:
+            basic_ratio_score = 90
+        elif basic_ratio >= 0.75:
+            basic_ratio_score = 80
+        elif basic_ratio >= 0.7:
+            basic_ratio_score = 70
+        elif basic_ratio >= 0.6:
+            basic_ratio_score = 60
+        else:
+            basic_ratio_score = 0
+
+        # 计算综合评分
+        score = inner_rate_score*0.6 + valid_percent_score*0.05 + basic_ratio_score*0.35
+        return score
+
+    def test_strategy_specific_condition(
+        self, 
+        condition: Dict, 
+        display: bool = False,
+        sqlite_file: str = TEST_CONDITION_SQLITE3,
+        table_name: str = 'condition'
+        ):
+        """
+        测试回测类的闭环效果,测试对象为特定的测试条件,测试结果将保存到数据库
+        :param condition: 测试条件,字典类型,结构如下:{'strategy': 'ROE', 'test_condition': {...}}
+        :param display: 是否显示中间结果
+        :param sqlite_file: 保存测试结果的sqlite3数据库文件
+        :param table_name: 保存测试结果的sqlite3数据库中的表名
+        :return: None
+        """
+        strategy = condition['strategy']
+
+        if strategy == 'ROE':
+            result = self.ROE_only_strategy_backtest_from_1991(**condition['test_condition'])
+        elif strategy == 'ROE-MOS':
+            result = self.ROE_MOS_strategy_backtest_from_1991(**condition['test_condition'])
+        elif strategy == 'ROE-DIVIDEND':
+            result = self.ROE_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
+        if display:
+            print('+'*120)
+            print(result)
+        
+        # 测试该测试结果和指数的收益对比
+        portfolio_test_result = self.test_strategy_portfolio(strategy=strategy, result=result, index_list=['000300'])
+        if display:
+            print('+'*120)
+            print(portfolio_test_result)
+        
+        # 测试该测试结果的评估
+        evaluate_result = self.evaluate_portfolio_effect(condition, result, portfolio_test_result)
+        if display:
+            print('+'*120)
+            print(evaluate_result)
+        
+        # 将该测试结果保存到数据库
+        self.save_strategy_to_sqlite3(evaluate_result, sqlite_file, table_name)
+
+    def test_strategy_random_condition(
+        self, 
+        times: int = 10, 
+        display: bool = False,
+        sqlite_file: str = TEST_CONDITION_SQLITE3,
+        table_name: str = CONDITION_TABLE
+        ):
+        """
+        测试回测类的闭环效果,测试对象为随机生成的测试条件
+        :param times: 测试次数
+        :param display: 是否显示中间结果
+        :param sqlite_file: 保存测试结果的sqlite3数据库文件
+        :param table_name: 保存测试结果的sqlite3数据库中的表名
+        :return: None
+        """
+
+        start = time.time()
+        number = 0
+
+        # 循环10次
+        for i in range(times):
+            print(f'第{i+1}轮测试......'.ljust(120, ' '))
+
+            # 生成测试参数
+            # strategy_list  = ['ROE', 'ROE-MOS', 'ROE-PE-PB', 'ROE-DIVIDEND', 'COM-RANKS', 'PE-PB']
+            strategy_list  = ['ROE-MOS', 'ROE-DIVIDEND', 'ROE', 'COM-RANKS']
+            strategy = random.choice(strategy_list)
+            items = random.randint(1, 5)
+
+            number += items
+
+            # 生成ROE型测试条件
+            condition_list = self.generate_ROE_test_conditions(strategy=strategy, items=items)
+            if display:
+                print('+'*120)
+                print(condition_list)
+
+            for condition in condition_list:
+                print(f'测试条件：{condition}'.ljust(120, ' '))
+                self.test_strategy_specific_condition(condition=condition, display=display, sqlite_file=sqlite_file, table_name=table_name)
+
+        end = time.time()
+        print('+'*120)
+        print(f'共测试{number}次，耗时{round(end-start, 4)}秒')
+        print(f'平均每次测试耗时{round((end-start)/number, 4)}秒')
+
+    def get_conditions_from_sqlite3(self, src_sqlite3: str, src_table: str) -> List[Dict]:
+        """
+        从指定的sqlite3数据库中获取测试条件集.
+        :param src_sqlite3: 指定的sqlite3数据库文件
+        :param src_table: 指定的sqlite3数据库中的表名
+        :return: 测试条件集
+        """
+        
+        # 定义返回值
+        conditions = []
+
+        # 从sqlite3数据库中获取测试条件集
+        con = sqlite3.connect(src_sqlite3)
+        with con:
+            sql = f""" SELECT * FROM '{src_table}' """
+            df = pd.read_sql_query(sql, con)
+            df = df.drop_duplicates(subset=['strategy', 'test_condition'], keep='last')
+            strategy_list = df['strategy'].tolist()
+            condition_list = df['test_condition'].tolist()
+
+            for strategy, condition in zip(strategy_list, condition_list):
+                tmp = {
+                    'strategy': strategy,
+                    'test_condition': json.loads(condition)
+                }
+                conditions.append(tmp)
+        return conditions
+
+    def retest_conditions_from_sqlite3(
+        self,
+        src_sqlite3: str,
+        src_table: str,
+        dest_sqlite3: str,
+        dest_table: str,
+    ):
+        """
+        从指定的sqlite3数据库中获取测试条件集,重新测试后保存至指定的数据库.
+        :param src_sqlite3: 指定的sqlite3数据库文件
+        :param src_table: 指定的sqlite3数据库中的表名
+        :param dest_sqlite3: 保存测试结果的sqlite3数据库文件
+        :param dest_table: 保存测试结果的sqlite3数据库中的表名
+        :return: None
+        """
+
+        # 获取测试条件集
+        conditions = self.get_conditions_from_sqlite3(src_sqlite3=src_sqlite3, src_table=src_table)
+
+        # 重新测试
+        for condition in conditions:
+            tmp_conditons = self.get_conditions_from_sqlite3(src_sqlite3=dest_sqlite3, src_table=dest_table)
+            # 如果condition不在目标表格的tmp_conditions列表中,则重新测试。避免重复测试以节约时间.
+            if condition not in tmp_conditons:
+                print(f'测试条件：{condition}'.ljust(120, ' '))
+                self.test_strategy_specific_condition(condition=condition, display=False, sqlite_file=dest_sqlite3, table_name=dest_table)
+    
+    @staticmethod
+    def ROE_only_strategy_backtest_from_1991(roe_list:List=[20]*5, roe_value=None, period:int=5) -> Dict:
+        """
+        带有回测功能的单一ROE选股策略, 从1991年开始回测.筛选过程中使用INDICATOR_ROE_FROM_1991数据库的年度roe数据.
+        年度财务指标公布完成是4月30日,为避免信息误差的问题,以此构建组合的时间应该在第二年5月份以后,
+        :param roe_list: roe筛选列表,函数按照提供的参数值对股票进行筛选.提供了这个参数,则忽略roe_value参数.列表长度等于period.
+        :param roe_value: roe筛选值,函数将其转化为一个相同元素的列表,列表长度等于period.
+        :param period: 筛选条件中roe数据包含的年份数. 
+        :return:返回值为字典格式,键为时间组,标明ROE起止期间, 值标明选出股票代码集合及期间内年度ROE值.
+        比如'Y2000-Y1994': [...], 表示该时间组选股是以1994年-2000年ROE值为筛选条件,列表内元素为选股结果,该列表是一个复合列表.
+        """
+        # 检测参数
+        if roe_list and len(roe_list) != period:
+            raise ValueError('roe_list列表长度应等于period')
+        if not all(map(lambda x: isinstance(x, float) or isinstance(x, int), roe_list)):
+            raise ValueError('roe_list列表元素应为数字')
+        if not roe_list and not roe_value:
+            raise ValueError('roe_list和roe_value不能同时为空')
+        if not roe_list and roe_value:
+            roe_list = [roe_value]*period
+        
+        result = {}  # 定义返回值
+        con = sqlite3.connect(INDICATOR_ROE_FROM_1991)
+        with con:
+            sql = f"""select * from '{ROE_TABLE}' """
+            df = pd.read_sql_query(sql, con)
+            columns = df.columns
+            del df
+
+            for index, item in enumerate(columns):
+                if index >= 3 and index+period <= len(columns):  # 动态构建查询范围
+                    year_list = columns[index: index+period]
+                    suffix = """stockcode, stockname, stockclass, """
+                    for col, year in enumerate(year_list):
+                        if col == len(year_list) -1:
+                            suffix += f"""{year} """
+                        else:
+                            suffix += f"""{year}, """
+
+                    sql = f"""select {suffix} from '{ROE_TABLE}' where """  # 构建查询条件
+                    for col, year in enumerate(year_list):
+                        if col == len(year_list) -1:
+                            sql += f"""{year}>=?"""
+                        else:
+                            sql += f"""{year}>=? and """
+                    res = con.execute(sql, tuple(roe_list)).fetchall()
+                    result[f"""{columns[index]}-{columns[index+period-1]}"""] = res
+        return result
+
+    def ROE_DIVIDEND_strategy_backtest_from_1991(
+        self, 
+        roe_list: List, 
+        period: int, 
+        dividend: float,
+    ) -> Dict:
+        """
+        ROE+股息率选股策略, 从1991年开始回测.筛选过程中使用INDICATOR_ROE_FROM_1991数据库的年度roe数据.
+        :param roe_list: roe筛选列表,函数按照提供的参数值对股票进行筛选.提供了这个参数,则忽略roe_value参数.列表长度等于period.
+        :param period: 筛选条件中roe数据包含的年份数.
+        :param dividend: 股息率筛选值,在筛选出的股票中再次筛选,筛选条件为股息率大于等于dividend.
+        :return: 返回值为字典格式。字典键为时间组,标明ROE起止期间, 值标明选出股票代码集合及期间内年度ROE值.
+        比如'Y2000-Y1994': [...], 表示该时间组选股是以1994年-2000年ROE值为筛选条件,
+        列表内元素为选股结果,该列表是一个复合列表.(2023-04-24)
+        """
+        # 检查参数
+        if roe_list and len(roe_list) != period:
+            raise Exception('roe_list列表长度和period不相等')
+        if not all(map(lambda x: isinstance(x, float) or isinstance(x, int), roe_list)):
+            raise Exception('roe_list列表元素应为浮点数或者整数')
+        if dividend < 0:
+            dividend = 0
+
+        result = {}  # 定义返回值
+        tmp_result = self.ROE_only_strategy_backtest_from_1991(roe_list=roe_list, period=period)
+        for date, stocks in tmp_result.items():  # 股息率筛选
+            tmp_date = f"{int(date[1:5])+1}"+'-06-01'  # 目标日期行
+            tmp_stocks = []  # 保存筛选结果
+            for stock in stocks: 
+                tmp_row = utils.find_closest_row_in_trade_record(code=stock[0][0:6], date=tmp_date)
+                if not tmp_row.empty:
+                    tmp_dividend = tmp_row['dividend'].values[0]
+                    if tmp_dividend >= dividend:
+                        tmp_stocks.append(stock)
+            result[date] = tmp_stocks
+        return result
+
+    def ROE_MOS_strategy_backtest_from_1991(self, roe_list: List, mos_range: List) -> Dict:
+        """
+        本策略在ROE_only的基础上,对每一时间组的测试结果再通过MOS_7筛选一次.
+        roe_list和period: 含义和使用方法和ROE_only_strategy_backtest_from_1991方法相同.
+        mos_range: mos_7筛选条件列表,长度为2,元素类型为整数或者浮点数.
+        返回值为字典,含义和ROE_only_strategy_backtest_from_1991方法相同.
+        """
+        # 检查参数
+        if len(roe_list) != 7:
+            raise Exception('roe_list参数年份数应为7年')
+        if len(mos_range) != 2:  # mos 上下限区间值
+            raise Exception('mos筛选区间列表应包含两个元素')
+        if not all(map(lambda x: isinstance(x, int) or isinstance(x, float), roe_list)):
+            raise Exception('roe_list列表元素应为浮点数或者整数')
+        if not all(map(lambda x: isinstance(x, int) or isinstance(x, float), mos_range)):
+            raise Exception('mos筛选区间列表元素应为浮点数或者整数')
+
+        tmp_result = self.ROE_only_strategy_backtest_from_1991(roe_list=roe_list, period=7)
+        result = {date: item for date, item in tmp_result.items() if int(date[7:11]) >= 1999}  # 定义返回值（1999-2005序列）
+        for date, stocks in result.items():
+            tmp_date = f"{int(date[1:5])+1}"+'-06-01'
+            tmp_stocks = []
+            for stock in stocks:
+                # 最早在date日期30天以内运行,否者无法获取国债收益率,最后时间组会是空代码集合.
+                mos_7 = utils.calculate_MOS_7_from_2006(code=stock[0][0:6], date=tmp_date)
+                if mos_range[1] >= mos_7 >= mos_range[0]:
+                    tmp_stocks.append(stock)
+            result[date] = tmp_stocks
+        return result
+
+
+if __name__ == "__main__":
+    stockbacktest = Strategy()
+    while True:
+        print('++++++++++++++++++++++++++++++++++++++++++++++')
+        print('+++++++ ROE ROE-DIVIDEND ROE-MOS QUIT ++++++++')
+        print('++++++++++++++++++++++++++++++++++++++++++++++')
+        msg = input('>>>> 请选择操作提示 <<<< ')
+        if msg.upper() == 'ROE':
+            while True:
+                try:
+                    roe_value = float(input('>>>> 请输入roe筛选值(数字型) <<<< '))
+                    break
+                except:
+                    ...
+            while True:
+                try:
+                    period = int(input('>>>> 请输入时间跨度(整数型5-10之间) <<<< '))
+                    if 10 >= period >= 5:
+                        break
+                except:
+                    ...
+            roe_list = [roe_value]*period
+            print('正在执行ROE选股策略,请稍等......')
+            print('++'*50)
+            res = stockbacktest.ROE_only_strategy_backtest_from_1991(roe_list=roe_list, period=period)
+            for key, value in sorted(res.items(), key=lambda x: x[0]):
+                print(key, '投资组合', f'共{len(value)}', '只股票')
+                stock_codes = []
+                for item in value:
+                    print(item)
+                    stock_codes.append(item[0][0:6])
+                start_date = str(int(key[1:5])+1)+'-06-01'
+                end_date = str(int(key[1:5])+2)+'-06-01'
+                res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
+                print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+                res = utils.calculate_index_rising_value('000300', start_date, end_date)
+                print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+                print('--'*50)
+        elif msg.upper() == 'ROE-DIVIDEND':
+            while True:
+                try:
+                    roe_value = float(input('>>>> 请输入roe筛选值(数字型) <<<< '))
+                    break
+                except:
+                    ...
+            while True:
+                try:
+                    period = int(input('>>>> 请输入时间跨度(整数型5-10之间) <<<< '))
+                    if 10 >= period >= 5:
+                        break
+                except:
+                    ...
+            roe_list = [roe_value]*period
+            while True:
+                try:
+                    dividend = float(input('>>>> 请输入股息率筛选值(数字型) <<<< '))
+                    if dividend >= 0:
+                        break
+                except:
+                    ...
+            print('正在执行ROE-DIVIDEND选股策略,请稍等......')
+            print('++'*50)
+            res = stockbacktest.ROE_DIVIDEND_strategy_backtest_from_1991(roe_list=roe_list, period=period, dividend=dividend)
+            for key, value in sorted(res.items(), key=lambda x: x[0]):
+                print(key, '投资组合', f'共{len(value)}', '只股票')
+                stock_codes = []
+                for item in value:
+                    print(item)
+                    stock_codes.append(item[0][0:6])
+                start_date = str(int(key[1:5])+1)+'-06-01'
+                end_date = str(int(key[1:5])+2)+'-06-01'
+                res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
+                print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+                res = utils.calculate_index_rising_value('000300', start_date, end_date)
+                print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+                print('--'*50)
+        elif msg.upper() == 'ROE-MOS':
+            while True:
+                try:
+                    roe_value = float(input('>>>> 请输入roe筛选值(数字型) <<<< '))
+                    break
+                except:
+                    ...
+            roe_list = [roe_value] * 7
+            while True:
+                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a-b形式,ab均为数字型) <<<< ')
+                mos_list = mos_tmp.split('-')
+                try:
+                    a = float(mos_list[0])
+                    b = float(mos_list[1])
+                    mos_range = [a, b]
+                    if 0 <= a <= b <= 1:
+                        break
+                except:
+                    ...
+            print('正在执行ROE-MOS选股策略,请稍等......')
+            print('++'*50)
+            res = stockbacktest.ROE_MOS_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range)
+            for key, value in sorted(res.items(), key=lambda x: x[0]):
+                print(key, '投资组合', f'共{len(value)}', '只股票')
+                stock_codes = []
+                for item in value:
+                    print(item)
+                    stock_codes.append(item[0][0:6])
+                start_date = str(int(key[1:5])+1)+'-06-01'
+                end_date = str(int(key[1:5])+2)+'-06-01'
+                res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
+                print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+                res = utils.calculate_index_rising_value('000300', start_date, end_date)
+                print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+                print('--'*50)
+        elif msg.upper() == 'QUIT':
+            break
+        else:
+            continue
+
