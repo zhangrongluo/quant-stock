@@ -70,7 +70,7 @@ def calculate_MOS_7_from_2006(code: str, date: str) -> float:
 def calculate_index_rising_value(code: str, start_date: str, end_date: str) -> float:
     """
     计算000300 399006 000905指数期间涨幅
-    :param code: 指数代码, 例如: '000300.SH'
+    :param code: 指数代码, 例如: '000300'
     :param start_date: 开始日期, 例如: '2019-01-01'
     :param end_date: 结束日期, 例如: '2019-01-01'
     :return: 指数的涨幅
@@ -79,7 +79,7 @@ def calculate_index_rising_value(code: str, start_date: str, end_date: str) -> f
         raise ValueError('请检查指数代码是否正确(000300, 399006, 000905)')
     full_code = f'{code}.SH' if code.startswith('000') else f'{code}.SZ'
     pro = ts.pro_api()
-    df = pro.index_daily(ts_code=full_code, adj='qfq', start_date=start_date, end_date=end_date)
+    df = pro.index_daily(ts_code=full_code, start_date=start_date, end_date=end_date)
     if df is None or df.empty:
         rate = 0.00
     else:
@@ -96,7 +96,7 @@ def calculate_stock_rising_value(code: str, start_date: str, end_date: str) -> f
     :return: 组合的涨幅
     """
     full_code = f'{code}.SH' if code.startswith('6') else f'{code}.SZ'
-    df = ts.pro_bar(ts_code=full_code, adj='qfq', start_date=start_date, end_date=end_date)
+    df = ts.pro_bar(ts_code=full_code, start_date=start_date, end_date=end_date)
     if df is None or df.empty:
         rate = 0.00
     else:

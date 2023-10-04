@@ -374,8 +374,7 @@ class Strategy:
             print(f'第{i+1}轮测试......'.ljust(120, ' '))
 
             # 生成测试参数
-            # strategy_list  = ['ROE', 'ROE-MOS', 'ROE-PE-PB', 'ROE-DIVIDEND', 'COM-RANKS', 'PE-PB']
-            strategy_list  = ['ROE-MOS', 'ROE-DIVIDEND', 'ROE', 'COM-RANKS']
+            strategy_list  = ['ROE-MOS', 'ROE-DIVIDEND', 'ROE']
             strategy = random.choice(strategy_list)
             items = random.randint(1, 5)
 
@@ -531,7 +530,7 @@ class Strategy:
             for stock in stocks: 
                 tmp_row = utils.find_closest_row_in_trade_record(code=stock[0][0:6], date=tmp_date)
                 if not tmp_row.empty:
-                    tmp_dividend = tmp_row['dividend'].values[0]
+                    tmp_dividend = tmp_row['dv_ttm'].values[0]
                     if tmp_dividend >= dividend:
                         tmp_stocks.append(stock)
             result[date] = tmp_stocks

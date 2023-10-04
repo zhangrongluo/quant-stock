@@ -225,7 +225,6 @@ def create_ROE_indicators_table_from_1991(code: str):
         if int(key[0:4]) < 1991:
             del roe_dict[key]
     roe_dict = dict(sorted(roe_dict.items(), key=lambda x: x[0], reverse=True))  # 按照键降序排序
-    print(roe_dict)
     con = sqlite3.connect(INDICATOR_ROE_FROM_1991)
     with con:
         full_code = code + '.SH' if code.startswith('6') else code + '.SZ'

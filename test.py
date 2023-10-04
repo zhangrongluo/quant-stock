@@ -45,9 +45,7 @@ def has_test_previous_year() -> bool:
 
 
 if __name__ == '__main__':
-
     case = Strategy()
-
     while True:
         now = time.localtime()
         table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
@@ -102,9 +100,4 @@ if __name__ == '__main__':
                         UPDATE flag SET flag='Yes' WHERE year='{time.localtime().tm_year}'
                     """
                     con.execute(sql)
-
-        if now.tm_hour >= 6 and now.tm_hour < 23:
-            case.test_strategy_random_condition(table_name=table_name)
-        else:
-            print('劳逸结合,现在休息......', end='\r', flush=True)
-            time.sleep(600)
+        case.test_strategy_random_condition(table_name=table_name)
