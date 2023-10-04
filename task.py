@@ -15,11 +15,10 @@ from concurrent.futures import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 import swindustry as sw
 import data
-import test
+from test import auto_test, lock
 from path import TEST_CONDITION_SQLITE3
 import threading
 
-lock = threading.Lock()
 scheduler = BackgroundScheduler()
 codes = [item[0][0:6] for item in sw.get_all_stocks()]
 
@@ -56,7 +55,7 @@ def run():
     scheduler.add_job(update_curve_sqlite3, 'cron', hour=19, minute=40)
     scheduler.add_job(copy_test_condition_sqlite3, 'cron', day_of_week=5, hour=7, minute=30)
     scheduler.start()
-    thread = threading.Thread(target=test.auto_test)
+    thread = threading.Thread(target=auto_test)
     thread.start()
     while True:
         time.sleep(1)

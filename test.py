@@ -5,6 +5,7 @@ from strategy import Strategy
 from path import TEST_CONDITION_SQLITE3
 import threading
 
+lock = threading.Lock()
 # quant-stock系统所有测试条件保存在test-condition.sqlite3数据库中,每个年份一个表,用于保存该年度的全部测试条件,表名格式为condition-年份.
 # 每年的1-5月生成的测试条件保存在上年的表中,比如2023年1-5月生成的测试条件保存在condition-2022表中.
 # 每年的6-12月生成的测试条件保存在当年的表中,比如2023年6-12月生成的测试条件保存在condition-2023表中.
@@ -47,7 +48,6 @@ def auto_test():
     每天下午6点至7点30分之外的时间执行自动测试任务
     """
     case = Strategy()
-    lock = threading.Lock()
     while True:
         with lock:
             now = time.localtime()
