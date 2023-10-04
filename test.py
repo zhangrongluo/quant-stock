@@ -101,12 +101,12 @@ def auto_test():
                     """
                     con.execute(sql)
         
-        # 每天下午6点至7点30分之外的时间执行自动测试任务
-        if now.tm_hour >= 18 and now.tm_hour <= 19 and now.tm_min >= 0 and now.tm_min <= 30:
-            print(f'当前时间: {time.localtime()}, 系统更新数据时间, 不执行测试\r' + ' '*10, end='', flush=True)
-            time.sleep(120)
+        # 每天下午6点至8点之间更新数据,停止测试.
+        if now.tm_hour in [18, 19]:
+            print(f"当前时间{now.tm_hour:2d}:{now.tm_min:2d}:{now.tm_sec:2d},系统更新数据.\r" + ' '*20, end='', flush=True)
+            time.sleep(1)
         else:
-            case.test_strategy_random_condition(table_name=table_name)
-
+            case.auto_test()
+        
 if __name__ == '__main__':
     auto_test()
