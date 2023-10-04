@@ -4,12 +4,9 @@ import sqlite3
 from strategy import Strategy
 from path import TEST_CONDITION_SQLITE3
 
-# win-stock系统所有测试条件保存在test-condition.sqlite3数据库中,每个年份一个表,用于保存该年度的全部测试条件,表名格式为condition-年份.
+# quant-stock系统所有测试条件保存在test-condition.sqlite3数据库中,每个年份一个表,用于保存该年度的全部测试条件,表名格式为condition-年份.
 # 每年的1-5月生成的测试条件保存在上年的表中,比如2023年1-5月生成的测试条件保存在condition-2022表中.
 # 每年的6-12月生成的测试条件保存在当年的表中,比如2023年6-12月生成的测试条件保存在condition-2023表中.
-
-# 每天早上6点至下午11点,执行回测函数.
-
 
 def has_test_previous_year() -> bool:
     """
@@ -43,8 +40,11 @@ def has_test_previous_year() -> bool:
         else:
             return True if res[0] == 'Yes' else False
 
-
-if __name__ == '__main__':
+def auto_test():
+    """
+    自动测试函数.
+    每天下午6点至7点30分之外的时间执行自动测试任务
+    """
     case = Strategy()
     while True:
         now = time.localtime()
@@ -100,4 +100,13 @@ if __name__ == '__main__':
                         UPDATE flag SET flag='Yes' WHERE year='{time.localtime().tm_year}'
                     """
                     con.execute(sql)
-        case.test_strategy_random_condition(table_name=table_name)
+        
+        # 每天下午6点至7点30分之外的时间执行自动测试任务
+        if now.tm_hour >= 18 and now.tm_hour <= 19 and now.tm_min >= 0 and now.tm_min <= 30:
+            print(f'当前时间: {time.localtime()}, 系统更新数据时间, 不执行测试\r' + ' '*10, end='', flush=True)
+            time.sleep(120)
+        else:
+            case.test_strategy_random_condition(table_name=table_name)
+
+if __name__ == '__main__':
+    auto_test()

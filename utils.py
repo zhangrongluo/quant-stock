@@ -176,6 +176,6 @@ def find_closest_row_in_curve_table(date: str):
 
 if __name__ == "__main__":
     res = calculate_stock_rising_value('000333', '2022-06-01', '2023-06-01')
-    print(res)
-    res = calculate_index_rising_value('000300', '2023-06-01', '2024-06-01')
-    print(res)
+    print(f"2022-06-01至2023-06-01,000333涨幅为{res:.2%}")
+    res = calculate_index_rising_value('000300', '2022-06-01', '2023-06-01')
+    print(f"2023-06-01至2024-06-01,000300涨幅为{res:.2%}")
