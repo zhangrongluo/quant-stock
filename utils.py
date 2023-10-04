@@ -74,9 +74,18 @@ def calculate_index_rising_value(code: str, start_date: str, end_date: str) -> f
     :param start_date: 开始日期, 例如: '2019-01-01'
     :param end_date: 结束日期, 例如: '2019-01-01'
     :return: 指数的涨幅
+    NOTE:
+    调用index_daily时日期格式如果是yyyy-mm-dd,则返回的结果是错误的,必须转换为yyyymmdd格式.
+    而calculate_stock_rising_value函数则没有这个问题.
+    为保持参数输入一致性,统一在两个函数转换日期格式.
     """
     if code not in ['000300', '399006', '000905']:
         raise ValueError('请检查指数代码是否正确(000300, 399006, 000905)')
+    date_regex = re.compile(r"^\d{4}-\d{2}-\d{2}$")  # 日期格式转换
+    if date_regex.match(start_date):
+        start_date = start_date.replace('-', '')
+    if date_regex.match(end_date):
+        end_date = end_date.replace('-', '')
     full_code = f'{code}.SH' if code.startswith('000') else f'{code}.SZ'
     pro = ts.pro_api()
     df = pro.index_daily(ts_code=full_code, start_date=start_date, end_date=end_date)
@@ -95,6 +104,11 @@ def calculate_stock_rising_value(code: str, start_date: str, end_date: str) -> f
     :param end_date: 结束日期, 例如: '2019-01-01'
     :return: 组合的涨幅
     """
+    date_regex = re.compile(r"^\d{4}-\d{2}-\d{2}$")  # 日期格式转换
+    if date_regex.match(start_date):
+        start_date = start_date.replace('-', '')
+    if date_regex.match(end_date):
+        end_date = end_date.replace('-', '')
     full_code = f'{code}.SH' if code.startswith('6') else f'{code}.SZ'
     df = ts.pro_bar(ts_code=full_code, start_date=start_date, end_date=end_date)
     if df is None or df.empty:
