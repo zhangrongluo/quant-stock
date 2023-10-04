@@ -52,8 +52,8 @@ def copy_test_condition_sqlite3():
             print('拷贝TEST_CONDITION_SQLITE3完成' + ' '*20, flush=True)
 
 def run():
-    scheduler.add_job(update_trade_record_csv, 'cron', hour=23, minute=50)
-    scheduler.add_job(update_curve_sqlite3, 'cron', hour=18, minute=10)
+    scheduler.add_job(update_trade_record_csv, 'cron', hour=19, minute=30)
+    scheduler.add_job(update_curve_sqlite3, 'cron', hour=19, minute=40)
     scheduler.add_job(copy_test_condition_sqlite3, 'cron', day_of_week=5, hour=7, minute=30)
     scheduler.start()
     thread = threading.Thread(target=test.auto_test)
