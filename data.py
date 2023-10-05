@@ -321,7 +321,7 @@ def update_trade_record_csv(code: str):
     df1 = pro.daily_basic(ts_code=full_code, start_date=start_date, end_date=end_date, 
     fields=["ts_code","trade_date","pe_ttm","pb","ps_ttm","circ_mv","dv_ttm","total_mv"])
     if df1.empty:
-        print(f"{full_code}无可更新数据." + '\r', end='', flush=True)
+        print(f"{full_code}无可更新数据." + ' '*10 + '\r', end='', flush=True)
         return  # 如果df1为空,则无可更新数据,直接返回
     tmp = sw.get_name_and_class_by_code(code=code)  # 插入公司简称和行业分类
     df1.insert(2, 'company', tmp[0])

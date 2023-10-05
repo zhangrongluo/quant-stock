@@ -1,4 +1,5 @@
 import os
+import time
 
 # 内置目录
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -29,4 +30,5 @@ if not os.path.exists(SW_INDUSTRY_XLS):
 # 数据库表名
 ROE_TABLE = "indicators"  # indicator-roe-from-1991.sqlite3中的表
 CURVE_TABLE = "curve"  # curve.sqlite3中的表
-CONDITION_TABLE = "conditions"  # test-condition.sqlite3中的表
+now = time.localtime()
+CONDITION_TABLE = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}' # test-condition中的表

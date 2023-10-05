@@ -2,7 +2,7 @@ import time
 import pandas as pd
 import sqlite3
 from strategy import Strategy
-from path import TEST_CONDITION_SQLITE3
+from path import TEST_CONDITION_SQLITE3, CONDITION_TABLE
 import threading
 
 lock = threading.Lock()
@@ -51,7 +51,6 @@ def auto_test():
     while True:
         with lock:
             now = time.localtime()
-            table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
             if now.tm_mon in [1, 2, 3, 4, 5]:
                 # 设置当年的flag值为No
                 con = sqlite3.connect(TEST_CONDITION_SQLITE3)
@@ -65,7 +64,7 @@ def auto_test():
                 con = sqlite3.connect(TEST_CONDITION_SQLITE3)
                 with con:
                     sql = f"""
-                        CREATE TABLE IF NOT EXISTS '{table_name}'
+                        CREATE TABLE IF NOT EXISTS '{CONDITION_TABLE}'
                         (
                             strategy TEXT, 
                             test_condition TEXT, 
@@ -90,7 +89,7 @@ def auto_test():
                         prev_table_names = [table for table in all_table_names if str(now.tm_year) not in table and table != 'flag']
 
                         for prev_table in prev_table_names:
-                            case.retest_conditions_from_sqlite3(src_sqlite3=TEST_CONDITION_SQLITE3, src_table=prev_table, dest_sqlite3=TEST_CONDITION_SQLITE3, dest_table=table_name)
+                            case.retest_conditions_from_sqlite3(src_sqlite3=TEST_CONDITION_SQLITE3, src_table=prev_table, dest_sqlite3=TEST_CONDITION_SQLITE3, dest_table=CONDITION_TABLE)
 
                         # 如果没有当年的flag记录,则插入当年的flag值为Yes
                         sql = f"""
@@ -103,7 +102,7 @@ def auto_test():
                             UPDATE flag SET flag='Yes' WHERE year='{time.localtime().tm_year}'
                         """
                         con.execute(sql)
-            case.test_strategy_random_condition()
+            case.test_strategy_random_condition(sqlite_file=TEST_CONDITION_SQLITE3, table_name=CONDITION_TABLE)
         
 if __name__ == '__main__':
     auto_test()

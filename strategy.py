@@ -192,14 +192,13 @@ class Strategy:
         :param sqlite_file: 目标数据库文件路径,默认为TEST_CONDITION_SQLITE3.
         :param table_name: 目标数据库表名,默认为CONDITION_TABLE.
         :return: None
-        NOTE:综合得分低于80分或者valid_percent小于0.25,不保存返回
+        NOTE:
+        综合得分低于90分或者valid_percent小于0.33,不保存返回,比win-stock系统要严格.
         """
-        if evaluate_result['score'] < 80 or evaluate_result['valid_percent'] < 0.25:
+        if evaluate_result['score'] < 90 or evaluate_result['valid_percent'] < 0.33:
             return
-        # 在tmp-file文件夹下创建数据库文件,文件名为test-condition.sqlite3
         conn = sqlite3.connect(sqlite_file)
         with conn:
-            # 创建表,要求以stratrgy和test_condition为主键
             sql = f"""
                 CREATE TABLE IF NOT EXISTS '{table_name}'
                 (
@@ -216,7 +215,7 @@ class Strategy:
                     PRIMARY KEY(strategy, test_condition)
                 )
             """
-            conn.execute(sql)
+            conn.execute(sql)  # 创建表格
 
             sql = f"""
                 INSERT OR REPLACE INTO '{table_name}'
@@ -247,16 +246,16 @@ class Strategy:
                 )
             """
             conn.execute(sql)
-            print('保存测试条件到数据库成功!')
+            print('已保存测试条件到数据库!')
 
     @staticmethod
     def get_score_of_test_condition(inner_rate: float, valid_percent: float, basic_ratio: float) -> float:
         """
-        - 获取测试条件的评分,综合评分规则为:basic_ratio*0.35+inner_rate*0.6+valid_percent*0.05.
-        - inner_rate valid_percent basic_ratio最大得分均为100分.单项评分如下:
-        - inner_rate: [0.25-]:100分, [0.2-0.25]:90分, [0.15-0.2]:80分, [0.1-0.15]:70分, [0.06-0.1]:60分
-        - valid_percent: [0.7-]:100分, [0.6-0.7]:90分, [0.5-0.6]:80分, [0.4-0.5]:70分, [0.3-0.4]:60分
-        - basic_ratio: [0.85-]:100分, [0.8-0.85]:90分, [0.75-0.8]:80分, [0.7-0.75]:70分, [0.6-0.7]:60分
+        获取测试条件的评分,综合评分规则为:basic_ratio*0.35+inner_rate*0.6+valid_percent*0.05.
+        inner_rate valid_percent basic_ratio最大得分均为100分.单项评分如下:
+        inner_rate: [0.25-]:100分, [0.2-0.25]:90分, [0.15-0.2]:80分, [0.1-0.15]:70分, [0.06-0.1]:60分
+        valid_percent: [0.7-]:100分, [0.6-0.7]:90分, [0.5-0.6]:80分, [0.4-0.5]:70分, [0.3-0.4]:60分
+        basic_ratio: [0.85-]:100分, [0.8-0.85]:90分, [0.75-0.8]:80分, [0.7-0.75]:70分, [0.6-0.7]:60分
         :param inner_rate: 内在收益率
         :param valid_percent: 有效时间组占比
         :param basic_ratio: 对000300的胜率
@@ -313,7 +312,7 @@ class Strategy:
         condition: Dict, 
         display: bool = False,
         sqlite_file: str = TEST_CONDITION_SQLITE3,
-        table_name: str = 'condition'
+        table_name: str = CONDITION_TABLE
         ):
         """
         测试回测类的闭环效果,测试对象为特定的测试条件,测试结果将保存到数据库
@@ -324,7 +323,6 @@ class Strategy:
         :return: None
         """
         strategy = condition['strategy']
-
         if strategy == 'ROE':
             result = self.ROE_only_strategy_backtest_from_1991(**condition['test_condition'])
         elif strategy == 'ROE-MOS':
@@ -365,28 +363,19 @@ class Strategy:
         :param table_name: 保存测试结果的sqlite3数据库中的表名
         :return: None
         """
-
         start = time.time()
         number = 0
-
-        # 循环10次
         for i in range(times):
             print(f'第{i+1}轮测试......'.ljust(120, ' '))
-
-            # 生成测试参数
-            strategy_list  = ['ROE-MOS', 'ROE-DIVIDEND', 'ROE']
-            strategy = random.choice(strategy_list)
+            strategy = random.choice(['ROE-MOS', 'ROE-DIVIDEND', 'ROE'])
             items = random.randint(1, 5)
-
             number += items
+            condition_list = self.generate_ROE_test_conditions(strategy=strategy, items=items)  # 生成测试条件
 
-            # 生成ROE型测试条件
-            condition_list = self.generate_ROE_test_conditions(strategy=strategy, items=items)
             if display:
                 print('+'*120)
                 print(condition_list)
-
-            for condition in condition_list:
+            for condition in condition_list:  # 测试
                 print(f'测试条件：{condition}'.ljust(120, ' '))
                 self.test_strategy_specific_condition(condition=condition, display=display, sqlite_file=sqlite_file, table_name=table_name)
 
@@ -402,11 +391,7 @@ class Strategy:
         :param src_table: 指定的sqlite3数据库中的表名
         :return: 测试条件集
         """
-        
-        # 定义返回值
-        conditions = []
-
-        # 从sqlite3数据库中获取测试条件集
+        conditions = []  # 定义返回值
         con = sqlite3.connect(src_sqlite3)
         with con:
             sql = f""" SELECT * FROM '{src_table}' """
@@ -414,7 +399,6 @@ class Strategy:
             df = df.drop_duplicates(subset=['strategy', 'test_condition'], keep='last')
             strategy_list = df['strategy'].tolist()
             condition_list = df['test_condition'].tolist()
-
             for strategy, condition in zip(strategy_list, condition_list):
                 tmp = {
                     'strategy': strategy,
@@ -438,14 +422,9 @@ class Strategy:
         :param dest_table: 保存测试结果的sqlite3数据库中的表名
         :return: None
         """
-
-        # 获取测试条件集
         conditions = self.get_conditions_from_sqlite3(src_sqlite3=src_sqlite3, src_table=src_table)
-
-        # 重新测试
-        for condition in conditions:
+        for condition in conditions:  # 重新测试
             tmp_conditons = self.get_conditions_from_sqlite3(src_sqlite3=dest_sqlite3, src_table=dest_table)
-            # 如果condition不在目标表格的tmp_conditions列表中,则重新测试。避免重复测试以节约时间.
             if condition not in tmp_conditons:
                 print(f'测试条件：{condition}'.ljust(120, ' '))
                 self.test_strategy_specific_condition(condition=condition, display=False, sqlite_file=dest_sqlite3, table_name=dest_table)
@@ -461,7 +440,6 @@ class Strategy:
         :return:返回值为字典格式,键为时间组,标明ROE起止期间, 值标明选出股票代码集合及期间内年度ROE值.
         比如'Y2000-Y1994': [...], 表示该时间组选股是以1994年-2000年ROE值为筛选条件,列表内元素为选股结果,该列表是一个复合列表.
         """
-        # 检测参数
         if roe_list and len(roe_list) != period:
             raise ValueError('roe_list列表长度应等于period')
         if not all(map(lambda x: isinstance(x, float) or isinstance(x, int), roe_list)):
@@ -514,7 +492,6 @@ class Strategy:
         比如'Y2000-Y1994': [...], 表示该时间组选股是以1994年-2000年ROE值为筛选条件,
         列表内元素为选股结果,该列表是一个复合列表.(2023-04-24)
         """
-        # 检查参数
         if roe_list and len(roe_list) != period:
             raise Exception('roe_list列表长度和period不相等')
         if not all(map(lambda x: isinstance(x, float) or isinstance(x, int), roe_list)):
@@ -543,7 +520,6 @@ class Strategy:
         mos_range: mos_7筛选条件列表,长度为2,元素类型为整数或者浮点数.
         返回值为字典,含义和ROE_only_strategy_backtest_from_1991方法相同.
         """
-        # 检查参数
         if len(roe_list) != 7:
             raise Exception('roe_list参数年份数应为7年')
         if len(mos_range) != 2:  # mos 上下限区间值
@@ -559,7 +535,6 @@ class Strategy:
             tmp_date = f"{int(date[1:5])+1}"+'-06-01'
             tmp_stocks = []
             for stock in stocks:
-                # 最早在date日期30天以内运行,否者无法获取国债收益率,最后时间组会是空代码集合.
                 mos_7 = utils.calculate_MOS_7_from_2006(code=stock[0][0:6], date=tmp_date)
                 if mos_range[1] >= mos_7 >= mos_range[0]:
                     tmp_stocks.append(stock)
