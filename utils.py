@@ -173,6 +173,18 @@ def find_closest_row_in_curve_table(date: str):
         match_row = df.iloc[0:1, :]
     return match_row
 
+def get_indicator_in_trade_record(code: str, date: str, fields: str) -> float:
+    """
+    获取指定股票指定日期的指定字段值
+    :param code: 股票代码, 例如: '600000' or '000001'
+    :param date: 日期, 例如: '2019-01-01'
+    :param fileds: 字段名称, 可选范围为: ['pe_ttm', 'pb', 'ps_ttm', 'dv_ttm', 'total_mv', 'circ_mv']
+    :return: 指定字段的值
+    """
+    if fields not in ['pe_ttm', 'pb', 'ps_ttm', 'dv_ttm', 'total_mv', 'circ_mv']:
+        raise ValueError('参数fields应为pe_ttm, pb, ps_ttm, dv_ttm, total_mv, circ_mv之一')
+    row = find_closest_row_in_trade_record(code, date)
+    return row[fields].values[0]
 
 if __name__ == "__main__":
     res = calculate_stock_rising_value('000333', '2022-06-01', '2023-06-01')

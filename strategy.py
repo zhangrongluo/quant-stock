@@ -76,16 +76,18 @@ class Strategy:
         strategy: str, 
         result: Dict, 
         index_list: List = ['000300', '399006', '000905'], 
-        days: int = 183
+        max_nembers: int = 15
     ) -> Union[str, Dict]:
         """
         对选股策略的测试结果进行初步测试,生成该测试结果每个时间组股票组合的收益率和指定指数的收益率,即测试结果和指数的收益对比.
         :param strategy:选股策略名称,目前支持'ROE','PE-PB','ROE-DIVIDEND','ROE-MOS'.
         :param result:策略类方法的返回值,即测试条件相对应的测试结果.
         :param index_list:指定测试的指数,默认为沪深300(000300),创业板指(399006),中证500(000905),最多为3个指数.
-        :param days:指定非ROE-...型策略中回测的时间间隔,即持有此组合的天数,默认为183天.
+        :param max_nembers:时间组最大平均选股数量,默认为15.
         :return:返回值为字典,键为时间组(和result参数时间组相同),值为该时间组的选股组合和指定指数的收益率.
-        NOTE:为了减轻计算压力,如果result参数时间组平均数量大于25,或者全部时间组选股数量合计大于288,直接返回定制的测试结果
+        NOTE:
+        quant-stock系统速度慢,相比win-stock而言,主打测试较小的组合.
+        如果result参数时间组平均持股数量大于15,直接返回定制的测试结果
         """
         # 检查参数
         if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS']:
@@ -94,8 +96,7 @@ class Strategy:
             raise ValueError('请检查指数代码是否正确')
         test_result = {date: [] for date in result.keys()}  # 定义返回值
 
-        if sum([len(item) for item in result.values()])/len(result) > 25 or \
-            sum([len(item) for item in result.values()]) > 288:
+        if sum([len(item) for item in result.values()])/len(result) > max_nembers:
             print('测试结果股票数量过多,为减轻计算压力,返回定制的结果')
             return {date: [0, 0] for date in result.keys()}
         
@@ -127,12 +128,11 @@ class Strategy:
         评估方法: 对某个测试结果中每个时间组的组合和指数的收益率对比,并计算该测试结果的内在收益率.
         某个测试结果战胜000300指数的比例为则basic_ration基本比率为0.如某个结果共10个有效时间组(valid_groups),战胜000300指数的次数为8次,
         则basic_ration为0.8.选股组合的inner_rate内在收益率为各有效时间组组合总收益的复合收益率.
-        计算basic_ratio和inner_rate均使用有效时间组(valid_groups),即该时间组包含的股票数在5至25之间.(2023-04-16)
+        计算basic_ratio和inner_rate均使用有效时间组(valid_groups),即该时间组包含的股票数在5至25之间.
         :param test_condition: 测试条件,结构为{'strategy': 'ROE', 'test_condition': {...}}.
         :param test_result: 测试结果,策略类方法的返回值.
-        :param portfolio_test_result: 测试结果和指数的收益对比,test_strategy_portfolio的返回值.(2023-04-17)
-        返回值为字典,字典键为测试条件,值为该测试条件的评估结果,结构为{'basic_ratio': 0.8, 'inner_rate': 0.1,...}. (2023-04-17)
-        增加了测试条件的综合评分项目.(2023-04-25)
+        :param portfolio_test_result: 测试结果和指数的收益对比,test_strategy_portfolio的返回值.
+        :return: 为该测试条件的评估结果,结构为{'basic_ratio': 0.8, 'inner_rate': 0.1,...}.
         """
         evaluate_result = {}  # 定义返回值
 
@@ -187,15 +187,16 @@ class Strategy:
         如某个结果综合得分超过80分且valid_percent大于25%,则储存该组合的测试条件和相关评估信息到数据库.
         数据库内容:strategy、test_condition、total_groups(总时间组数目)、valid_groups(有效时间组数目)、
         valid_percent(有效时间组占比)、valid_groups_keys(有效时间组清单)、basci_ratio(对000300的胜率)
-        和inner_rate(内在收益率).(2023-04-16)
+        和inner_rate(内在收益率)、score(综合得分)、date(保存日期).
         :param evaluate_result: 测试结果和指数收益对比的评估结果的返回值. 
         :param sqlite_file: 目标数据库文件路径,默认为TEST_CONDITION_SQLITE3.
         :param table_name: 目标数据库表名,默认为CONDITION_TABLE.
         :return: None
         NOTE:
-        综合得分低于90分或者valid_percent小于0.33,不保存返回,比win-stock系统要严格.
+        quant-stock系统速度慢,相比win-stock而言,入选条件要宽松一些.
+        综合得分低于85分或者valid_percent小于0.25,不保存返回.
         """
-        if evaluate_result['score'] < 90 or evaluate_result['valid_percent'] < 0.33:
+        if evaluate_result['score'] < 85 or evaluate_result['valid_percent'] < 0.25:
             return
         conn = sqlite3.connect(sqlite_file)
         with conn:
@@ -505,11 +506,9 @@ class Strategy:
             tmp_date = f"{int(date[1:5])+1}"+'-06-01'  # 目标日期行
             tmp_stocks = []  # 保存筛选结果
             for stock in stocks: 
-                tmp_row = utils.find_closest_row_in_trade_record(code=stock[0][0:6], date=tmp_date)
-                if not tmp_row.empty:
-                    tmp_dividend = tmp_row['dv_ttm'].values[0]
-                    if tmp_dividend >= dividend:
-                        tmp_stocks.append(stock)
+                tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
+                if tmp_dividend >= dividend:
+                    tmp_stocks.append(stock)
             result[date] = tmp_stocks
         return result
 
