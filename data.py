@@ -252,6 +252,36 @@ def create_ROE_indicators_table_from_1991(code: str):
         con.execute(sql, insert_value)  # 插入数据
     print(f"{full_code}历史ROE数据下载成功." + '\r', end='', flush=True)
 
+def invert_trade_record_to_win_stock_format(code: str, des_root_path: str):
+    """
+    将股票历史交易记录文件转换为WinStock格式,保存在des_path目录下.
+    :param code: 股票代码, 例如: '600000' or '000001'
+    :param des_root_path: 转换后的文件保存根目录
+    :return: None
+    NOTE:
+    转换后,使用win-stock系统data.init_trade_record_form_IPO函数,增加PC列完成最后的转换.
+    """
+    industry = sw.get_name_and_class_by_code(code=code)[1]
+    src_file = os.path.join(TRADE_RECORD_PATH, industry, code+'.csv')
+    des_file = os.path.join(des_root_path, industry, code+'.csv')
+    if not os.path.exists(src_file):
+        raise FileNotFoundError(f"未发现{src_file}历史交易记录文件,请检查.")
+    if not os.path.exists(os.path.dirname(des_file)):
+        os.makedirs(os.path.dirname(des_file))
+
+    df = pd.read_csv(src_file)
+    df.columns = ['股票代码', '日期', '名称', '行业', 'PE', 'PB', 'PS', 'DIVIDEND', '总市值', '流通市值']
+    df['日期'] = df['日期'].astype('object')
+    df['日期'] = df['日期'].apply(lambda x: str(x)[0:4] + '-' + str(x)[4:6] + '-' + str(x)[6:8])
+    df['股票代码'] = df['股票代码'].apply(lambda x: "'"+str(x)[0:6])
+    df = df[['日期', '股票代码', '名称', '总市值', 'PB', 'PE', 'PS', 'DIVIDEND']]
+    df['总市值'] = df['总市值'].fillna(0)
+    df['PB'] = df['PB'].fillna(0)
+    df['PE'] = df['PE'].fillna(0)
+    df['PS'] = df['PS'].fillna(0)
+    df['DIVIDEND'] = df['DIVIDEND'].fillna(0)
+    df.to_csv(des_file, index=False)
+
 def update_ROE_indicators_table_from_1991(code: str):
     """ 
     更新最新的年度ROE至INDICATOR_ROE_FROM_1991数据库.
