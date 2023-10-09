@@ -210,7 +210,8 @@ def create_ROE_indicators_table_from_1991(code: str):
     创建1991至上年年度ROE至indicator_roe_from_1991.sqlite3中
     :param code: 股票代码, 例如: '600000' or '000001'
     :return: None
-    NOTE: 被注释的第一行为使用Tushare接口的代码,速度仅为Xueqiu接口20%
+    NOTE: 
+    被注释的第一行为使用Tushare接口的代码,速度仅为Xueqiu接口20%
     """
     # roe_dict = get_ROE_indicators_from_Tushare(code=code)  # 使用tushare接口
     start_year = '19911231'
@@ -281,13 +282,15 @@ def invert_trade_record_to_win_stock_format(code: str, des_root_path: str):
     df['PS'] = df['PS'].fillna(0)
     df['DIVIDEND'] = df['DIVIDEND'].fillna(0)
     df.to_csv(des_file, index=False)
+    print(f"{code}历史交易记录文件转换成功." + '\r', end='', flush=True)
 
 def update_ROE_indicators_table_from_1991(code: str):
     """ 
     更新最新的年度ROE至INDICATOR_ROE_FROM_1991数据库.
     :params code: 股票代码, 例如: '600000' or '000001'
     :return: None
-    NOTE:当然也可以每年5月份之后重新执行一遍create_ROE_indicators_table_from_1991函数,只是比较耗时.
+    NOTE:
+    当然也可以每年5月份之后重新执行一遍create_ROE_indicators_table_from_1991函数,只是比较耗时.
     """
     # 根据日历时间获得需要插入的最新字段名,按照以下规则确定(假设现年份为2023年):
     today = datetime.date.today()
@@ -331,7 +334,8 @@ def update_trade_record_csv(code: str):
     更新股票历史交易记录文件至今日最新数据.
     :param code: 股票代码, 例如: '600000' or '000001'
     :return: None
-    NOTE:当然也可以重新一遍create_trade_record_csv_table函数,但是太耗时了.
+    NOTE:
+    当然也可以重新一遍create_trade_record_csv_table函数,但是太耗时了.
     """
     # 获取日期
     csv_file = os.path.join(TRADE_RECORD_PATH, sw.get_name_and_class_by_code(code=code)[1], code+'.csv')
@@ -377,6 +381,7 @@ def update_curve_value_table():
 
     if delta_day > 0:  # 如果日期差大于0,则更新数据
         create_curve_value_table(days=delta_day)
+    print(f"国债收率表更新成功." + ' '*20 + '\r', end='', flush=True)
 
 
 if __name__ == '__main__':

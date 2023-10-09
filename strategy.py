@@ -13,18 +13,21 @@ class Strategy:
         pass
 
     @staticmethod
-    def generate_ROE_test_conditions(strategy: str, items: int = 10) -> List[Dict]:
+    def generate_ROE_test_conditions(strategy: str, items: int = 10, mos_step: float = 0.25) -> List[Dict]:
         """
         生成测试条件列表,用于测试策略
         :param strategy: 策略名称, 例如: 'roe', 'roe-dividend', 'roe-mos'
         :param items: 生成的测试条件数量, 例如: 10
+        :param mos_step: 生成的测试条件中MOS_RANGE的最大步长
         :return: 测试条件列表
+        NOTE:
+        roe_value取值范围为[0, 40], 超过win-stock系统预设值[10, 40]
+        period取值范围为[5, 10], 和win-stock系统预设值[5, 10]相同
+        mos_range取值范围为[-1, 1], 超过win-stock系统预设值[0.2, 1],但是step限制为不大于0.25
+        dividend取值范围为[0, 10], 和win-stock系统预设值[0, 10]相同
         """
-        # 检查参数
         if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS']:
             raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS)')
-        if not 100 >= items >= 1:
-            raise ValueError('请检查items参数是否正确(1 <= items <= 100)')
 
         condition = []  # 定义返回值
         if strategy.upper() == 'ROE':
@@ -43,9 +46,10 @@ class Strategy:
         elif strategy.upper() == 'ROE-MOS':
             for item in range(items):
                 roe_value = random.randint(10, 40)
-                # 生成两个元素的列表,第二个要大于第一个,且两个元素都处于[0.2, 1]之间
-                mos_range = [round(random.uniform(0.2, 1), 4), round(random.uniform(0.2, 1), 4)]
+                mos_range = [round(random.uniform(-1, 1), 4), round(random.uniform(-1, 1), 4)]
                 mos_range.sort()
+                if mos_range[1] - mos_range[0] > mos_step:
+                    mos_range[0] = mos_range[1] - mos_step  # 限制mos_range的最大步长
                 tmp =  {
                     'strategy': strategy.upper(), 
                     'test_condition': {
@@ -89,7 +93,6 @@ class Strategy:
         quant-stock系统速度慢,相比win-stock而言,主打测试较小的组合.
         如果result参数时间组平均持股数量大于15,直接返回定制的测试结果
         """
-        # 检查参数
         if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS']:
             raise ValueError('请检查策略名称是否正确')
         if not all([item in ['000300', '399006', '000905'] for item in index_list]):
@@ -370,16 +373,15 @@ class Strategy:
             print(f'第{i+1}轮测试......'.ljust(120, ' '))
             strategy = random.choice(['ROE-MOS', 'ROE-DIVIDEND', 'ROE'])
             items = random.randint(1, 5)
+            mos_step = random.uniform(0.1, 0.30)
             number += items
-            condition_list = self.generate_ROE_test_conditions(strategy=strategy, items=items)  # 生成测试条件
-
+            condition_list = self.generate_ROE_test_conditions(strategy=strategy, items=items, mos_step=mos_step)
             if display:
                 print('+'*120)
                 print(condition_list)
             for condition in condition_list:  # 测试
                 print(f'测试条件：{condition}'.ljust(120, ' '))
                 self.test_strategy_specific_condition(condition=condition, display=display, sqlite_file=sqlite_file, table_name=table_name)
-
         end = time.time()
         print('+'*120)
         print(f'共测试{number}次，耗时{round(end-start, 4)}秒')

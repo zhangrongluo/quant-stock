@@ -3,10 +3,9 @@
 更新的对象是curve.sqlite3和trade-record目录下的csv文件
 indicator-roe-from-1991.sqlite3每年5月份以后更新或者新建一次即可
 NOTE:
-每日下午7点10分开始更新一次trade record csv文件
-每日下午7点40分开始更新一次curve.sqlite3
-在imac机器上每天下午6点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库
-auto_test任务避开这段时间,使用threading.Semaphore和threading.Lock进行同步
+每日下午6点30分更新trade record csv和curve.sqlite3,
+在imac机器上将TEST_CONDITION_SQLITE3拷贝到本地仓库.
+auto_test全时段运行,使用threading.Semaphore和threading.Lock处理线程同步.
 """
 import os
 import time
