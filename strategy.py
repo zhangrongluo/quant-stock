@@ -169,8 +169,8 @@ class Strategy:
         inner_rate = total_return ** (1 / len(valid_groups)) - 1 if valid_groups else 0
         evaluate_result['inner_rate'] = round(inner_rate, 4)
 
-        # 调用get_score_of_test_condition计算综合评分score
-        score = self.get_score_of_test_condition(
+        # 调用calculate_score_of_test_condition计算综合评分score
+        score = self.calculate_score_of_test_condition(
             evaluate_result['inner_rate'], evaluate_result['valid_percent'], evaluate_result['basic_ratio']
         )
         evaluate_result['score'] = score
@@ -253,7 +253,7 @@ class Strategy:
             print('已保存测试条件到数据库!')
 
     @staticmethod
-    def get_score_of_test_condition(inner_rate: float, valid_percent: float, basic_ratio: float) -> float:
+    def calculate_score_of_test_condition(inner_rate: float, valid_percent: float, basic_ratio: float) -> float:
         """
         获取测试条件的评分,综合评分规则为:basic_ratio*0.35+inner_rate*0.6+valid_percent*0.05.
         inner_rate valid_percent basic_ratio最大得分均为100分.单项评分如下:

@@ -328,6 +328,7 @@ def update_ROE_indicators_table_from_1991(code: str):
             con.execute(sql, (last_roe, stock_code))
         except sqlite3.IntegrityError:
             ...
+    print(f"{full_code}最新ROE数据更新成功." + " "*20 + '\r', end='', flush=True)
 
 def update_trade_record_csv(code: str):
     """
@@ -355,15 +356,17 @@ def update_trade_record_csv(code: str):
     df1 = pro.daily_basic(ts_code=full_code, start_date=start_date, end_date=end_date, 
     fields=["ts_code","trade_date","pe_ttm","pb","ps_ttm","circ_mv","dv_ttm","total_mv"])
     if df1.empty:
-        print(f"{full_code}无可更新数据." + ' '*10 + '\r', end='', flush=True)
+        print(f"{full_code}无可更新数据." + ' '*20 + '\r', end='', flush=True)
         return  # 如果df1为空,则无可更新数据,直接返回
     tmp = sw.get_name_and_class_by_code(code=code)  # 插入公司简称和行业分类
     df1.insert(2, 'company', tmp[0])
     df1.insert(3, 'industry', tmp[1])
+    df1.fillna(0, inplace=True)  # 填充空值
+    df_old.fillna(0, inplace=True)  # 填充空值
     df_new = pd.concat([df1, df_old], axis=0)  # 数据合并
     df_new['trade_date'] = df_new['trade_date'].astype('object')
     df_new.to_csv(csv_file, index=False)  # 保存文件
-    print(f"{full_code}历史交易记录文件更新成功." + '\r', end='', flush=True)
+    print(f"{full_code}历史交易记录文件更新成功." + " "*20 + '\r', end='', flush=True)
 
 def update_curve_value_table():
     """

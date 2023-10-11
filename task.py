@@ -55,6 +55,15 @@ def copy_test_condition_sqlite3():
             shutil.copyfile(TEST_CONDITION_SQLITE3, os.path.join(des_path, "test-condition-quant.sqlite3"))
             print('拷贝TEST_CONDITION_SQLITE3完成.' + ' '*20, flush=True)
 
+# 每年5月1日上午2点更新一次indicator-roe-from-1991.sqlite3
+@scheduler.scheduled_job('cron', month=5, day=1, hour=2, minute=0)
+def update_indicator_roe_from_1991():
+    with semaphore:
+        print('开始更新indicator-roe-from-1991.sqlite3\r', end='', flush=True)
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            executor.map(data.update_ROE_indicators_table_from_1991, codes)
+        print('更新indicator-roe-from-1991.sqlite3完成.' + ' '*20, flush=True)
+
 def run():
     scheduler.start()
     thread.start()
