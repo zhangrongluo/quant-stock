@@ -19,7 +19,8 @@ def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     :param code: 股票代码, 例如: '600000' or '000001'
     :param date: 日期, 例如: '2019-01-01'
     :return: 返回MOS_7值
-    NOTE:如果参数date的月份数在1-4月,ROE年份数取date参数年份-2前推7年,否者取date参数年份-1前推7年.
+    NOTE:
+    如果参数date的月份数在1-4月,ROE年份数取date参数年份-2前推7年,否者取date参数年份-1前推7年.
     """
     # 检查参数
     date_regex = re.compile(r"^\d{4}-\d{2}-\d{2}$")

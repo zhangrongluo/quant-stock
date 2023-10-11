@@ -1,5 +1,6 @@
 import os
 import time
+import pandas as pd
 
 # 内置目录
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -26,6 +27,7 @@ TEST_CONDITION_SQLITE3 = os.path.join(ROOT_PATH, "test-condition", "test-conditi
 
 if not os.path.exists(SW_INDUSTRY_XLS):
     raise FileNotFoundError(f"未在{SW_INDUSTRY_PATH}发现申万行业分类清单文件,请检查.")
+SW_INDUSTRY_DF = pd.read_excel(SW_INDUSTRY_XLS, usecols=['股票代码', '公司简称', '新版一级行业'])
 
 # 数据库表名
 ROE_TABLE = "indicators"  # indicator-roe-from-1991.sqlite3中的表

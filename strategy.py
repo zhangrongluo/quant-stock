@@ -46,10 +46,10 @@ class Strategy:
         elif strategy.upper() == 'ROE-MOS':
             for item in range(items):
                 roe_value = random.randint(10, 40)
-                mos_range = [round(random.uniform(-1, 1), 4), round(random.uniform(-1, 1), 4)]
+                mos_range = [round(random.uniform(-1, 1), 2) for _ in range(2)]
                 mos_range.sort()
                 if mos_range[1] - mos_range[0] > mos_step:
-                    mos_range[0] = mos_range[1] - mos_step  # 限制mos_range的最大步长
+                    mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
                 tmp =  {
                     'strategy': strategy.upper(), 
                     'test_condition': {
@@ -196,10 +196,9 @@ class Strategy:
         :param table_name: 目标数据库表名,默认为CONDITION_TABLE.
         :return: None
         NOTE:
-        quant-stock系统速度慢,相比win-stock而言,入选条件要宽松一些.
-        综合得分低于85分或者valid_percent小于0.25,不保存返回.
+        综合得分低于90分或者valid_percent小于0.33,不保存返回.
         """
-        if evaluate_result['score'] < 85 or evaluate_result['valid_percent'] < 0.25:
+        if evaluate_result['score'] < 90 or evaluate_result['valid_percent'] < 0.33:
             return
         conn = sqlite3.connect(sqlite_file)
         with conn:
