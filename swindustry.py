@@ -40,6 +40,7 @@ def get_stocks_of_specific_class(stock_class: str, contain_foreign = False) -> L
     tmp = df.loc[df['新版一级行业'] == stock_class]  # 选出类所在的若干行
     if not contain_foreign:
         criterion = df['股票代码'].map(lambda x: ('.SZ' in x) or ('.SH' in x) or ('.sh' in x) or ('.sz' in x))
+        criterion = criterion.reindex(tmp.index)
         result = tmp[criterion][['股票代码', '公司简称', '新版一级行业']].values.tolist()
     else:
         result = tmp[['股票代码', '公司简称', '新版一级行业']].values.tolist()

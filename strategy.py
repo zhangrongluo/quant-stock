@@ -46,7 +46,7 @@ class Strategy:
         elif strategy.upper() == 'ROE-MOS':
             for item in range(items):
                 roe_value = random.randint(10, 40)
-                mos_range = [round(random.uniform(-1, 1), 2) for _ in range(2)]
+                mos_range = [round(random.uniform(-1, 1), 4) for _ in range(2)]
                 mos_range.sort()
                 if mos_range[1] - mos_range[0] > mos_step:
                     mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长

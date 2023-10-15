@@ -388,6 +388,7 @@ def update_curve_value_table():
 
 
 if __name__ == '__main__':
+    stocks = [item[0][0:6] for item in sw.get_all_stocks()]
     while True:
         print('-------------------------操作提示-------------------------')
         print('Create-Trade-CSV      Create-Curve       Create-Roe-Table')
@@ -399,7 +400,9 @@ if __name__ == '__main__':
             break
         elif msg.upper() == 'CREATE-TRADE-CSV':
             print('正在创建trade-record csv文件,请稍等...\r', end='', flush=True)
-            create_all_stocks_trade_record_csv_table()
+            for stock in stocks:
+                create_trade_record_csv_table(stock)
+            # create_all_stocks_trade_record_csv_table()  # 使用线程池经常会中断,原因未知
             print('trade-record csv文件创建成功.'+ ' '*20)
         elif msg.upper() == 'CREATE-CURVE':
             print('正在创建curve表格,请稍等...\r', end='', flush=True)
@@ -410,15 +413,15 @@ if __name__ == '__main__':
             print('curve表格创建成功.'+ ' '*20)
         elif msg.upper() == 'CREATE-ROE-TABLE':
             print('正在创建indicators表格,请稍等...\r', end='', flush=True)
-            stocks = [item[0][0:6] for item in sw.get_all_stocks()]
             with ThreadPoolExecutor() as pool:
                 pool.map(create_ROE_indicators_table_from_1991, stocks)
             print('indicators表格创建成功.'+ ' '*20)
         elif msg.upper() == 'UPDATE-TRADE-CSV':
             print('正在更新trade-record csv文件,请稍等...\r', end='', flush=True)
-            stocks = [item[0][0:6] for item in sw.get_all_stocks()]
-            with ThreadPoolExecutor() as pool:
-                pool.map(update_trade_record_csv, stocks)
+            for stock in stocks:
+                update_trade_record_csv(stock)
+            # with ThreadPoolExecutor() as pool:  # 使用线程池经常会中断,原因未知
+            #     pool.map(update_trade_record_csv, stocks)
             print('trade-record csv文件更新成功.'+ ' '*20)
         elif msg.upper() == 'UPDATE-CURVE':
             print('正在更新curve表格,请稍等...\r', end='', flush=True)
@@ -426,7 +429,6 @@ if __name__ == '__main__':
             print('curve表格更新成功.'+ ' '*20)
         elif msg.upper() == 'UPDATE-ROE-TABLE':
             print('正在更新indicators表格,请稍等...\r', end='', flush=True)
-            stocks = [item[0][0:6] for item in sw.get_all_stocks()]
             with ThreadPoolExecutor() as pool:
                 pool.map(update_ROE_indicators_table_from_1991, stocks)
             print('indicators表格更新成功.'+ ' '*20)
