@@ -16,7 +16,7 @@ class Strategy:
     def generate_ROE_test_conditions(strategy: str, items: int = 10, mos_step: float = 0.25) -> List[Dict]:
         """
         生成测试条件列表,用于测试策略
-        :param strategy: 策略名称, 例如: 'roe', 'roe-dividend', 'roe-mos'
+        :param strategy: 策略名称, 例如: 'roe', 'roe-dividend', 'roe-mos', 'roe-mos-dividend'
         :param items: 生成的测试条件数量, 例如: 10
         :param mos_step: 生成的测试条件中MOS_RANGE的最大步长
         :return: 测试条件列表
@@ -26,8 +26,8 @@ class Strategy:
         mos_range取值范围为[-1, 1], 超过win-stock系统预设值[0.2, 1],但是step限制为不大于0.25
         dividend取值范围为[0, 10], 和win-stock系统预设值[0, 10]相同
         """
-        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS']:
-            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS)')
+        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND']:
+            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS, ROE-MOS-DIVIDEND)')
 
         condition = []  # 定义返回值
         if strategy.upper() == 'ROE':
@@ -73,6 +73,23 @@ class Strategy:
                     }
                 }
                 condition.append(tmp)
+        elif strategy.upper() == 'ROE-MOS-DIVIDEND':
+            for item in range(items):
+                roe_value = random.randint(10, 40)
+                mos_range = [round(random.uniform(-1, 1), 4) for _ in range(2)]
+                mos_range.sort()
+                if mos_range[1] - mos_range[0] > mos_step:
+                    mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
+                dividend = random.randint(0, 10)
+                tmp =  {
+                    'strategy': strategy.upper(),
+                    'test_condition': {
+                        'roe_list': [roe_value]*7,
+                        'mos_range': mos_range,
+                        'dividend': dividend
+                    }
+                }
+                condition.append(tmp)
         return condition
 
     def test_strategy_portfolio(
@@ -84,7 +101,7 @@ class Strategy:
     ) -> Union[str, Dict]:
         """
         对选股策略的测试结果进行初步测试,生成该测试结果每个时间组股票组合的收益率和指定指数的收益率,即测试结果和指数的收益对比.
-        :param strategy:选股策略名称,目前支持'ROE','PE-PB','ROE-DIVIDEND','ROE-MOS'.
+        :param strategy:选股策略名称,目前支持'ROE','PE-PB','ROE-DIVIDEND','ROE-MOS', 'ROE-MOS-DIVIDEND'.
         :param result:策略类方法的返回值,即测试条件相对应的测试结果.
         :param index_list:指定测试的指数,默认为沪深300(000300),创业板指(399006),中证500(000905),最多为3个指数.
         :param max_nembers:时间组最大平均选股数量,默认为15.
@@ -93,8 +110,8 @@ class Strategy:
         quant-stock系统速度慢,相比win-stock而言,主打测试较小的组合.
         如果result参数时间组平均持股数量大于15,直接返回定制的测试结果
         """
-        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS']:
-            raise ValueError('请检查策略名称是否正确')
+        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND']:
+            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS, ROE-MOS-DIVIDEND)')
         if not all([item in ['000300', '399006', '000905'] for item in index_list]):
             raise ValueError('请检查指数代码是否正确')
         test_result = {date: [] for date in result.keys()}  # 定义返回值
@@ -105,7 +122,7 @@ class Strategy:
         
         for date, stocks in sorted(result.items(), key=lambda x: x[0]):  # 对每个时间组的选股结果进行回测
             code_list = [item[0][0:6] for item in stocks]  # 不含后缀
-            if strategy.upper() in ['ROE', 'ROE-PE-PB', 'ROE-MOS', 'ROE-DIVIDEND']:  # roe type strategy
+            if strategy.upper() in ['ROE', 'ROE-PE-PB', 'ROE-MOS', 'ROE-DIVIDEND', 'ROE-MOS-DIVIDEND']:  # roe type strategy
                 start_date = str(int(date[1:5])+1)+'-06-01'
                 end_date = str(int(date[1:5])+2)+'-06-01'
             else:
@@ -162,7 +179,9 @@ class Strategy:
         basic_ratio = win_count / len(valid_groups) if valid_groups else 0
         evaluate_result['basic_ratio'] = round(basic_ratio, 4)
 
-        # 计算inner_rate TODO 当时间组间隔不等于1年的情况下,是否需要调整？
+        # 计算inner_rate 
+        # TODO:
+        # 当时间组间隔不等于1年的情况下,是否需要调整？
         total_return = 1
         for date, stocks in valid_groups.items():
             total_return *= (1 + portfolio_test_result[date][0])
@@ -332,6 +351,8 @@ class Strategy:
             result = self.ROE_MOS_strategy_backtest_from_1991(**condition['test_condition'])
         elif strategy == 'ROE-DIVIDEND':
             result = self.ROE_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
+        elif strategy == 'ROE-MOS-DIVIDEND':
+            result = self.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
         if display:
             print('+'*120)
             print(result)
@@ -370,7 +391,7 @@ class Strategy:
         number = 0
         for i in range(times):
             print(f'第{i+1}轮测试......'.ljust(120, ' '))
-            strategy = random.choice(['ROE-MOS', 'ROE-DIVIDEND', 'ROE'])
+            strategy = random.choice(['ROE-MOS', 'ROE-DIVIDEND', 'ROE', 'ROE-MOS-DIVIDEND'])
             items = random.randint(1, 5)
             mos_step = random.uniform(0.1, 0.30)
             number += items
@@ -541,13 +562,43 @@ class Strategy:
             result[date] = tmp_stocks
         return result
 
+    def ROE_MOS_DIVIDEND_strategy_backtest_from_1991(
+        self, 
+        roe_list: List, 
+        mos_range: List, 
+        dividend: float
+    ) -> Dict:
+        """
+        本策略在ROE_MOS的基础上,对每一时间组的测试结果再通过股息率筛选一次.
+        :param roe_list: 含义和使用方法和ROE_only_strategy_backtest_from_1991方法相同.
+        :param mos_range: 含义和使用方法和ROE_MOS_strategy_backtest_from_1991方法相同.
+        :param dividend: 股息率筛选值,在筛选出的股票中再次筛选,筛选条件为股息率大于等于dividend.
+        :return: 返回值为字典,含义和ROE_only_strategy_backtest_from_1991方法相同.
+        """
+        if len(roe_list) != 7:
+            raise Exception('roe_list参数年份数应为7年')
+        if dividend < 0:
+            dividend = 0
+
+        result = {}  # 定义返回值
+        tmp_result = self.ROE_MOS_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range)
+        for date, stocks in tmp_result.items():  # 股息率筛选
+            tmp_date = f"{int(date[1:5])+1}"+'-06-01'
+            tmp_stocks = []
+            for stock in stocks:
+                tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
+                if tmp_dividend >= dividend:
+                    tmp_stocks.append(stock)
+            result[date] = tmp_stocks
+        return result
+
 
 if __name__ == "__main__":
     stockbacktest = Strategy()
     while True:
-        print('++++++++++++++++++++++++++++++++++++++++++++++')
-        print('+++++++ ROE ROE-DIVIDEND ROE-MOS QUIT ++++++++')
-        print('++++++++++++++++++++++++++++++++++++++++++++++')
+        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+        print('+++++++ ROE ROE-DIVIDEND ROE-MOS ROE-MOS-DIVIDEND QUIT ++++++++')
+        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
         msg = input('>>>> 请选择操作提示 <<<< ')
         if msg.upper() == 'ROE':
             while True:
@@ -640,6 +691,48 @@ if __name__ == "__main__":
             print('正在执行ROE-MOS选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_MOS_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range)
+            for key, value in sorted(res.items(), key=lambda x: x[0]):
+                print(key, '投资组合', f'共{len(value)}', '只股票')
+                stock_codes = []
+                for item in value:
+                    print(item)
+                    stock_codes.append(item[0][0:6])
+                start_date = str(int(key[1:5])+1)+'-06-01'
+                end_date = str(int(key[1:5])+2)+'-06-01'
+                res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
+                print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+                res = utils.calculate_index_rising_value('000300', start_date, end_date)
+                print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+                print('--'*50)
+        elif msg.upper() == 'ROE-MOS-DIVIDEND':
+            while True:
+                try:
+                    roe_value = float(input('>>>> 请输入roe筛选值(数字型) <<<< '))
+                    break
+                except:
+                    ...
+            roe_list = [roe_value] * 7
+            while True:
+                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a-b形式,ab均为数字型) <<<< ')
+                mos_list = mos_tmp.split('-')
+                try:
+                    a = float(mos_list[0])
+                    b = float(mos_list[1])
+                    mos_range = [a, b]
+                    if 0 <= a <= b <= 1:
+                        break
+                except:
+                    ...
+            while True:
+                try:
+                    dividend = float(input('>>>> 请输入股息率筛选值(数字型) <<<< '))
+                    if dividend >= 0:
+                        break
+                except:
+                    ...
+            print('正在执行ROE-MOS-DIVIDEND选股策略,请稍等......')
+            print('++'*50)
+            res = stockbacktest.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range, dividend=dividend)
             for key, value in sorted(res.items(), key=lambda x: x[0]):
                 print(key, '投资组合', f'共{len(value)}', '只股票')
                 stock_codes = []

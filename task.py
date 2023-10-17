@@ -39,8 +39,7 @@ def update_trade_record_csv():
 def update_curve_sqlite3():
     with semaphore:
         print('开始更新curve.sqlite3\r', end='', flush=True)
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            executor.map(data.update_curve_value_table, codes)
+        data.update_curve_value_table()
         print('更新curve.sqlite3完成.' + ' '*20, flush=True)
 
 # 每周五上午7点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
