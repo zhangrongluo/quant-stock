@@ -49,60 +49,65 @@ def auto_test():
     """
     case = Strategy()
     while True:
+        now = time.localtime()
+        if now.tm_mon in [1, 2, 3, 4, 5]:
+            # 设置当年的flag值为No
+            con = sqlite3.connect(TEST_CONDITION_SQLITE3)
+            with con:
+                sql = f"""
+                    INSERT OR IGNORE INTO flag (year, flag) VALUES ('{time.localtime().tm_year}', 'No')
+                """
+                con.execute(sql)
+        elif now.tm_mon in [6, 7, 8, 9, 10, 11, 12]:
+            # 创建年度表格
+            con = sqlite3.connect(TEST_CONDITION_SQLITE3)
+            with con:
+                sql = f"""
+                    CREATE TABLE IF NOT EXISTS '{CONDITION_TABLE}'
+                    (
+                        strategy TEXT, 
+                        test_condition TEXT, 
+                        total_groups INTEGER, 
+                        valid_groups INTEGER, 
+                        valid_percent REAL, 
+                        valid_groups_keys TEXT, 
+                        basic_ratio REAL, 
+                        inner_rate REAL, 
+                        score REAL, 
+                        date TEXT,
+                        PRIMARY KEY(strategy, test_condition)
+                    )
+                """
+                con.execute(sql)
+
+                # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数,并保存结果到condition-2023表中.
+                if has_test_previous_year() is False:
+                    # 获取以前年度表格的表名(不包含当年的表)
+                    df = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table"', con)
+                    all_table_names = df['name'].tolist()
+                    prev_table_names = [table for table in all_table_names if str(now.tm_year) not in table and table != 'flag']
+
+                    for prev_table in prev_table_names:
+                        case.retest_conditions_from_sqlite3(src_sqlite3=TEST_CONDITION_SQLITE3, src_table=prev_table, dest_sqlite3=TEST_CONDITION_SQLITE3, dest_table=CONDITION_TABLE)
+
+                    # 如果没有当年的flag记录,则插入当年的flag值为Yes
+                    sql = f"""
+                        INSERT OR IGNORE INTO flag (year, flag) VALUES ('{time.localtime().tm_year}', 'Yes')
+                    """
+                    con.execute(sql)
+
+                    # 更新当年的flag值为Yes
+                    sql = f"""
+                        UPDATE flag SET flag='Yes' WHERE year='{time.localtime().tm_year}'
+                    """
+                    con.execute(sql)
         with lock:
-            now = time.localtime()
-            if now.tm_mon in [1, 2, 3, 4, 5]:
-                # 设置当年的flag值为No
-                con = sqlite3.connect(TEST_CONDITION_SQLITE3)
-                with con:
-                    sql = f"""
-                        INSERT OR IGNORE INTO flag (year, flag) VALUES ('{time.localtime().tm_year}', 'No')
-                    """
-                    con.execute(sql)
-            elif now.tm_mon in [6, 7, 8, 9, 10, 11, 12]:
-                # 创建年度表格
-                con = sqlite3.connect(TEST_CONDITION_SQLITE3)
-                with con:
-                    sql = f"""
-                        CREATE TABLE IF NOT EXISTS '{CONDITION_TABLE}'
-                        (
-                            strategy TEXT, 
-                            test_condition TEXT, 
-                            total_groups INTEGER, 
-                            valid_groups INTEGER, 
-                            valid_percent REAL, 
-                            valid_groups_keys TEXT, 
-                            basic_ratio REAL, 
-                            inner_rate REAL, 
-                            score REAL, 
-                            date TEXT,
-                            PRIMARY KEY(strategy, test_condition)
-                        )
-                    """
-                    con.execute(sql)
-
-                    # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数,并保存结果到condition-2023表中.
-                    if has_test_previous_year() is False:
-                        # 获取以前年度表格的表名(不包含当年的表)
-                        df = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table"', con)
-                        all_table_names = df['name'].tolist()
-                        prev_table_names = [table for table in all_table_names if str(now.tm_year) not in table and table != 'flag']
-
-                        for prev_table in prev_table_names:
-                            case.retest_conditions_from_sqlite3(src_sqlite3=TEST_CONDITION_SQLITE3, src_table=prev_table, dest_sqlite3=TEST_CONDITION_SQLITE3, dest_table=CONDITION_TABLE)
-
-                        # 如果没有当年的flag记录,则插入当年的flag值为Yes
-                        sql = f"""
-                            INSERT OR IGNORE INTO flag (year, flag) VALUES ('{time.localtime().tm_year}', 'Yes')
-                        """
-                        con.execute(sql)
-
-                        # 更新当年的flag值为Yes
-                        sql = f"""
-                            UPDATE flag SET flag='Yes' WHERE year='{time.localtime().tm_year}'
-                        """
-                        con.execute(sql)
-            case.test_strategy_random_condition(sqlite_file=TEST_CONDITION_SQLITE3, table_name=CONDITION_TABLE)
+            try:
+                case.test_strategy_random_condition(sqlite_file=TEST_CONDITION_SQLITE3, table_name=CONDITION_TABLE)
+                time.sleep(10)
+            except Exception as e:
+                print(f"auto_test()函数出现异常:{e}")
+                time.sleep(60)
         
 if __name__ == '__main__':
     auto_test()

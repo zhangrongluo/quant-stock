@@ -92,6 +92,38 @@ class Strategy:
                 condition.append(tmp)
         return condition
 
+    def display_result_of_strategy(self, strategy: Dict):
+        """
+        显示选股策略的具体结果.策略使用self.get_conditions_from_sqlite3获取.
+        结构如下:{'strategy': '...', 'test_condition': {...}}
+        :param strategy: roe、roe-dividend、roe-mos、roe-mos-dividend策略.
+        """
+        name = strategy['strategy']
+        condition = strategy['test_condition']
+        print(f"正在执行{name}选股策略,请稍等......")
+        print('++'*50)
+        if name.upper() == 'ROE':
+            res = self.ROE_only_strategy_backtest_from_1991(**condition)
+        elif name.upper() == 'ROE-MOS':
+            res = self.ROE_MOS_strategy_backtest_from_1991(**condition)
+        elif name.upper() == 'ROE-DIVIDEND':
+            res = self.ROE_DIVIDEND_strategy_backtest_from_1991(**condition)
+        elif name.upper() == 'ROE-MOS-DIVIDEND':
+            res = self.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(**condition)
+        for key, value in sorted(res.items(), key=lambda x: x[0]):
+            print(key, '投资组合', f'共{len(value)}', '只股票')
+            stock_codes = []
+            for item in value:
+                print(item)
+                stock_codes.append(item[0][0:6])
+            start_date = str(int(key[1:5])+1)+'-06-01'
+            end_date = str(int(key[1:5])+2)+'-06-01'
+            res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
+            print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+            res = utils.calculate_index_rising_value('000300', start_date, end_date)
+            print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+            print('--'*50)
+
     def test_strategy_portfolio(
         self, 
         strategy: str, 
@@ -678,13 +710,13 @@ if __name__ == "__main__":
                     ...
             roe_list = [roe_value] * 7
             while True:
-                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a-b形式,ab均为数字型) <<<< ')
-                mos_list = mos_tmp.split('-')
+                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a,b形式,ab均为数字型) <<<< ')
+                mos_list = mos_tmp.split(',')
                 try:
                     a = float(mos_list[0])
                     b = float(mos_list[1])
                     mos_range = [a, b]
-                    if 0 <= a <= b <= 1:
+                    if -1 <= a <= b <= 1:
                         break
                 except:
                     ...
@@ -713,13 +745,13 @@ if __name__ == "__main__":
                     ...
             roe_list = [roe_value] * 7
             while True:
-                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a-b形式,ab均为数字型) <<<< ')
-                mos_list = mos_tmp.split('-')
+                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a,b形式,ab均为数字型) <<<< ')
+                mos_list = mos_tmp.split(',')
                 try:
                     a = float(mos_list[0])
                     b = float(mos_list[1])
                     mos_range = [a, b]
-                    if 0 <= a <= b <= 1:
+                    if -1 <= a <= b <= 1:
                         break
                 except:
                     ...
