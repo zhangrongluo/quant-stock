@@ -624,6 +624,48 @@ class Strategy:
             result[date] = tmp_stocks
         return result
 
+    @staticmethod
+    def select_portfilio_conditions(
+        valid_percent = 0.40, 
+        basic_ratio = 0.75, 
+        inner_rate = 0.25, 
+        sqlite_name = TEST_CONDITION_SQLITE3, 
+        table_name = CONDITION_TABLE,
+    ) -> Union[pd.DataFrame, None]:
+        """
+        从数据库中获取符合条件的测试条件集,构建投资组合.
+        :param valid_percent: 最低有效时间组占比
+        :param basic_ratio: 最低对000300的胜率
+        :param inner_rate: 最低内在收益率
+        :param sqlite_name: sqlite3数据库文件名
+        :param table_name: sqlite3数据库表名
+        :return: 符合条件的测试条件集
+        """
+        con = sqlite3.connect(sqlite_name)
+        with con:
+            sql = f"""
+                SELECT * FROM '{table_name}' 
+                WHERE valid_percent >= {valid_percent} 
+                AND basic_ratio >= {basic_ratio} 
+                AND inner_rate >= {inner_rate}            
+            """
+            df = pd.read_sql_query(sql, con)
+            if df.empty:
+                return
+
+            for index, row in df.iterrows():
+                condition = json.loads(row['test_condition'])
+                # 添加roe辅助列以便排序分组
+                if row['strategy'] == "ROE":
+                    df.loc[index, 'roe'] = condition['roe_value']*condition['period']
+                elif row['strategy'] in ["ROE-MOS", "ROE-DIVIDEND", "ROE-MOS-DIVIDEND"]:
+                    df.loc[index, 'roe'] = condition['roe_list'][0]
+                else:
+                    ...
+            # 按照strategy和roe进行分组,按照inner_rate进行排序
+            df = df.groupby(['strategy', 'roe']).apply\
+                (lambda x: x.sort_values(by='inner_rate', ascending=False)).reset_index(drop=True)
+        return df
 
 if __name__ == "__main__":
     stockbacktest = Strategy()
