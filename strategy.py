@@ -4,6 +4,7 @@ import random
 import datetime
 import json
 import pandas as pd
+import numpy as np
 from typing import List, Dict, Union
 import utils
 from path import INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, CONDITION_TABLE
@@ -625,15 +626,15 @@ class Strategy:
         return result
 
     @staticmethod
-    def select_portfilio_conditions(
+    def select_portfolio_conditions_by_rate(
         valid_percent = 0.40, 
         basic_ratio = 0.75, 
         inner_rate = 0.25, 
         sqlite_name = TEST_CONDITION_SQLITE3, 
-        table_name = CONDITION_TABLE,
+        table_name = CONDITION_TABLE
     ) -> Union[pd.DataFrame, None]:
         """
-        从数据库中获取符合条件的测试条件集,构建投资组合.
+        通过指标值获取符合条件的测试条件集,构建投资组合.
         :param valid_percent: 最低有效时间组占比
         :param basic_ratio: 最低对000300的胜率
         :param inner_rate: 最低内在收益率
@@ -666,6 +667,47 @@ class Strategy:
             df = df.groupby(['strategy', 'roe']).apply\
                 (lambda x: x.sort_values(by='inner_rate', ascending=False)).reset_index(drop=True)
         return df
+
+    def select_portfolio_conditions_by_percentile(
+        self,
+        valid_percentile=50,
+        basic_ratio_percentile=50,
+        inner_rate_percentile=50,
+        sqlite_name=TEST_CONDITION_SQLITE3,
+        table_name=CONDITION_TABLE
+    ) -> Union[pd.DataFrame, None]:
+        """
+        通过指标百分位数获取符合条件的测试条件集,构建投资组合.
+        :param valid_percentile: 最低有效时间组占比的百分位数
+        :param basic_ratio_percentile: 最低对000300的胜率的百分位数
+        :param inner_rate_percentile: 最低内在收益率的百分位数
+        :param sqlite_name: sqlite3数据库文件名
+        :param table_name: sqlite3数据库表名
+        :return: 符合条件的测试条件集
+        NOTE:
+        本函数通过调用self.select_portfolio_conditions_by_rate函数实现.
+        """
+        con = sqlite3.connect(sqlite_name)
+        with con:
+            sql = f"""
+                SELECT * FROM '{table_name}' 
+            """
+            df = pd.read_sql_query(sql, con)
+            if df.empty:
+                return
+
+        valid_percent = np.percentile(df['valid_percent'], valid_percentile)
+        basic_ratio = np.percentile(df['basic_ratio'], basic_ratio_percentile)
+        inner_rate = np.percentile(df['inner_rate'], inner_rate_percentile)
+        res = self.select_portfilio_conditions(
+            valid_percent=valid_percent,
+            basic_ratio=basic_ratio,
+            inner_rate=inner_rate,
+            sqlite_name=sqlite_name,
+            table_name=table_name
+        )
+        return res
+
 
 if __name__ == "__main__":
     stockbacktest = Strategy()
