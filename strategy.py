@@ -641,6 +641,8 @@ class Strategy:
         :param sqlite_name: sqlite3数据库文件名
         :param table_name: sqlite3数据库表名
         :return: 符合条件的测试条件集
+        NOTE:
+        三个指标值均位于0-1之间,表示实际取值.
         """
         con = sqlite3.connect(sqlite_name)
         with con:
@@ -686,6 +688,7 @@ class Strategy:
         :return: 符合条件的测试条件集
         NOTE:
         本函数通过调用self.select_portfolio_conditions_by_rate函数实现.
+        三个指标百分位参数均位于0-100之间,如输入50,则表示获取中位数.
         """
         con = sqlite3.connect(sqlite_name)
         with con:
@@ -699,7 +702,7 @@ class Strategy:
         valid_percent = np.percentile(df['valid_percent'], valid_percentile)
         basic_ratio = np.percentile(df['basic_ratio'], basic_ratio_percentile)
         inner_rate = np.percentile(df['inner_rate'], inner_rate_percentile)
-        res = self.select_portfilio_conditions(
+        res = self.select_portfolio_conditions_by_rate(
             valid_percent=valid_percent,
             basic_ratio=basic_ratio,
             inner_rate=inner_rate,

@@ -45,7 +45,6 @@ def has_test_previous_year() -> bool:
 def auto_test():
     """
     自动测试函数.
-    每天下午6点至7点30分之外的时间执行自动测试任务
     """
     case = Strategy()
     while True:
