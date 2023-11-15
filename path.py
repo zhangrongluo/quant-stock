@@ -33,4 +33,4 @@ SW_INDUSTRY_DF = pd.read_excel(SW_INDUSTRY_XLS, usecols=['股票代码', '公司
 ROE_TABLE = "indicators"  # indicator-roe-from-1991.sqlite3中的表
 CURVE_TABLE = "curve"  # curve.sqlite3中的表
 now = time.localtime()
-CONDITION_TABLE = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}' # test-condition中的表
+CONDITION_TABLE = f'condition-{now.tm_year}' if now.tm_mon >= 6 else f'condition-{now.tm_year-1}' # 每年6月建新表

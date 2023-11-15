@@ -5,6 +5,7 @@ import pandas as pd
 import datetime
 import time
 import random
+import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict, Union
 import tushare as ts
 import swindustry as sw
@@ -46,6 +47,7 @@ def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     with con:
         sql = f"SELECT {suffix} FROM '{ROE_TABLE}' WHERE stockcode=?"
         tmp = con.execute(sql, (stock_code, )).fetchone()
+        tmp = [0 if item is None else item for item in tmp]  # None替换成0
         num_zero = list(tmp).count(0.00)
         if num_zero == 7:
             raise ValueError(f'{stock_code}7年roe值均为0.00')
@@ -186,6 +188,62 @@ def get_indicator_in_trade_record(code: str, date: str, fields: str) -> float:
         raise ValueError('参数fields应为pe_ttm, pb, ps_ttm, dv_ttm, total_mv, circ_mv之一')
     row = find_closest_row_in_trade_record(code, date)
     return row[fields].values[0]
+
+def save_whole_MOS_7_figure(code: str, dest: str):
+    """ 
+    绘制完整的MOS_7图形保存到指定目录.
+    开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
+    则以2006-03-01为最早日期.结束日期为交易记录的最晚日期.
+    :param code: 股票代码, 例如: '600000' or '000001'
+    :param dest: 图形保存目录
+    """
+    sw_class = sw.get_name_and_class_by_code(code)[1]
+    csv_file = os.path.join(TRADE_RECORD_PATH, sw_class, f"{code}.csv")
+    df = pd.read_csv(csv_file)
+    df['trade_date'] = pd.to_datetime(df['trade_date'], format='%Y%m%d')
+    earliest_date = df['trade_date'].min()
+    latest_date = df['trade_date'].max()
+    start_date1 = datetime.datetime.strptime('2006-03-01', '%Y-%m-%d')
+    if earliest_date < start_date1:
+        start_date = "2006-03-01"
+    else:
+        start_date = earliest_date.strftime("%Y-%m-%d")
+    end_date = latest_date.strftime("%Y-%m-%d")
+    
+    date_range = pd.date_range(
+        start=start_date, end=end_date, freq='D'
+    ).strftime("%Y-%m-%d").tolist()
+    mos_list = []
+    for date in date_range:
+        tmp = calculate_MOS_7_from_2006(code=code, date=date)
+        mos_list.append(tmp)
+
+    plt.rcParams['font.sans-serif'] = ['Songti SC'] # 设置中文显示
+    plt.plot(date_range, mos_list)
+    plt.fill_between(date_range, mos_list, color='grey', alpha=0.1)
+    name = sw.get_name_and_class_by_code(code)[0]  # 设置标题
+    title = f"{name} MOS_7 曲线图 (自 {start_date} 到 {end_date})"
+    plt.title(title)
+    plt.xticks(
+        [date_range[0], date_range[len(date_range)//4], 
+        date_range[len(date_range)//2], 
+        date_range[len(date_range)//4*3], date_range[-1]]
+    )  # 设置x轴刻度
+    plt.gca().yaxis.set_major_formatter(
+        plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
+    )  # 设置y轴刻度
+    plt.gca().yaxis.grid(True)
+    fig = plt.gcf()
+    fig.set_size_inches(16, 10)
+    
+    if not os.path.exists(dest):
+        os.mkdir(dest)
+    s = start_date.replace('-', '')
+    e = end_date.replace('-', '')
+    file_name = f"{code}-{s}-{e}.png"
+    dest_file = os.path.join(dest, file_name)
+    plt.savefig(dest_file)
+    print(f"已保存{dest_file}")
 
 if __name__ == "__main__":
     res = calculate_stock_rising_value('000333', '2022-06-01', '2023-06-01')
