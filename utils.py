@@ -16,7 +16,7 @@ def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     使用INDICATOR_ROE_FROM_1991等数据库计算7年MOS值,需要获取7年roe平均值 10年期国债收益率和PB.
     7年roe值取自于INDICATOR_ROE_FROM_1991数据库,10年期国债收益率取自于curve数据库,pb值取自CSV文件.
     date参数指定国债收益率和PB的日期,为yyyy-mm-dd型字符串.
-    curve数据库自2006-03-01开始,故7年roe序列最早为2006年-2012年序列.
+    curve数据库自2006-03-01开始,故date参数不应早于2006-03-01.
     :param code: 股票代码, 例如: '600000' or '000001'
     :param date: 日期, 例如: '2019-01-01'
     :return: 返回MOS_7值
@@ -27,12 +27,15 @@ def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     date_regex = re.compile(r"^\d{4}-\d{2}-\d{2}$")
     if not date_regex.match(date):
         raise ValueError('参数date应为yyyy-mm-dd型字符串')
-    this_year = datetime.datetime.now().year
-    year_month_list = date.split('-')
-    if not this_year >= int(year_month_list[0]) >= 2006:
-        raise ValueError('参数date的年份应在2006至当前年份之间')
+    if date < '2006-03-01':
+        raise ValueError('参数date不应早于2006-03-01')
+    today_str = datetime.datetime.now().strftime('%Y-%m-%d')
+    if date > today_str:
+        date = today_str
     
     # 获取7年平均ROE值
+    this_year = datetime.datetime.now().year
+    year_month_list = date.split('-')
     end_year = int(year_month_list[0]) - 1 if int(year_month_list[1]) >= 5 else int(year_month_list[0]) - 2
     average_roe_7 = 0.00
     stock_code = f'{code}.SH' if code.startswith('6') else f'{code}.SZ'
@@ -189,13 +192,14 @@ def get_indicator_in_trade_record(code: str, date: str, fields: str) -> float:
     row = find_closest_row_in_trade_record(code, date)
     return row[fields].values[0]
 
-def save_whole_MOS_7_figure(code: str, dest: str):
+def save_whole_MOS_7_figure(code: str, dest: str, show_figure: bool = False):
     """ 
     绘制完整的MOS_7图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
     则以2006-03-01为最早日期.结束日期为交易记录的最晚日期.
     :param code: 股票代码, 例如: '600000' or '000001'
     :param dest: 图形保存目录
+    :param show_figure: 是否显示图形
     """
     sw_class = sw.get_name_and_class_by_code(code)[1]
     csv_file = os.path.join(TRADE_RECORD_PATH, sw_class, f"{code}.csv")
@@ -222,7 +226,7 @@ def save_whole_MOS_7_figure(code: str, dest: str):
     plt.plot(date_range, mos_list)
     plt.fill_between(date_range, mos_list, color='grey', alpha=0.1)
     name = sw.get_name_and_class_by_code(code)[0]  # 设置标题
-    title = f"{name} MOS_7 曲线图 (自 {start_date} 到 {end_date})"
+    title = f"{name} MOS-7 曲线图 (自 {start_date} 到 {end_date})"
     plt.title(title)
     plt.xticks(
         [date_range[0], date_range[len(date_range)//4], 
@@ -232,7 +236,17 @@ def save_whole_MOS_7_figure(code: str, dest: str):
     plt.gca().yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )  # 设置y轴刻度
-    plt.gca().yaxis.grid(True)
+    max_mos = max(mos_list)  # 设置最高点和最低点
+    min_mos = min(mos_list)
+    max_date = date_range[mos_list.index(max_mos)]
+    min_date = date_range[mos_list.index(min_mos)]
+    plt.text(
+        max_date, max_mos, f"最高点: {max_mos:.2%}", ha='center', va='bottom', fontsize=12
+    )
+    plt.text(
+        min_date, min_mos, f"最低点: {min_mos:.2%}", ha='center', va='top', fontsize=12
+    )
+    plt.gca().yaxis.grid(True)  # 显示网格
     fig = plt.gcf()
     fig.set_size_inches(16, 10)
     
@@ -244,6 +258,63 @@ def save_whole_MOS_7_figure(code: str, dest: str):
     dest_file = os.path.join(dest, file_name)
     plt.savefig(dest_file)
     print(f"已保存{dest_file}")
+    if show_figure:
+        plt.show()
+
+def get_gaps_statistic_data(code: str, is_index: bool = False) -> Dict[str, List]:
+    """ 
+    获取股票和指数缺口及回补情况
+    :param code: 股票代码, 例如: '600000' or '000001'
+    :param is_index: 是否为指数
+    :return: 缺口及回补情况.键为缺口日期,值为[缺口类型, 回补日期, 回补天数]
+    NOTE:
+    缺口类型: up(向上跳空)和down(向下跳空)
+    """
+    pro = ts.pro_api()
+    if not is_index:
+        ts_code = f'{code}.SH' if code.startswith('6') else f'{code}.SZ'
+        df = pro.daily(ts_code=ts_code)
+    else:
+        ts_code = f'{code}.SH' if code.startswith('000') else f'{code}.SZ'
+        df = pro.index_daily(ts_code=ts_code)
+    # 向上缺口:今日最低价>昨日最高价
+    # 向下缺口:今日最高价<昨日最低价
+    # 逐行检查,判断是否存在缺口,如有则记录前一日的日期和缺口类型
+    result = {}  # 返回值
+    for index, row in df.iterrows():
+        if index == len(df) - 1:
+            break
+        elif row['low'] > df.iloc[index+1]['high']:
+            date = df.iloc[index+1]['trade_date']
+            result[date] = ['up', ]
+        elif row['high'] < df.iloc[index+1]['low']:
+            date = df.iloc[index+1]['trade_date']
+            result[date] = ['down', ]
+    # 计算回补日期,回补天数和回补幅度
+    # 排序遍历缺口记录result,如果为up类型缺口,则搜索后续日期,
+    # 如果出现最低价<缺口日最高价,则记录该日期为回补日期.
+    # 如果为down类型缺口,则搜索后续日期,如果出现最高价>
+    # 缺口日最低价,则记录该日期为回补日期.
+    result = dict(sorted(result.items(), key=lambda x:x[0], reverse=False))
+    for date, item in result.items():
+        if item[0]  == "up":
+            high = df[df['trade_date'] == date]['high'].values[0]
+            tmp_df = df[(df['low'] < high)&(df['trade_date'] > date)]
+        elif item[0] == "down":
+            low = df[df['trade_date'] == date]['low'].values[0]
+            tmp_df = df[(df['high'] > low)&(df['trade_date'] > date)]
+        if not tmp_df.empty:
+            tmp_df = tmp_df.sort_values(by='trade_date', ascending=True)
+            close_to_div = df[df['trade_date'] == date]['close'].values[0]
+            item.append(tmp_df.iloc[0]['trade_date'])
+            item.append(
+                (datetime.datetime.strptime(tmp_df.iloc[0]['trade_date'], '%Y%m%d')
+                 - datetime.datetime.strptime(date, '%Y%m%d')).days
+            )
+        else:
+            item.append(None)
+            item.append(None)
+    return result
 
 if __name__ == "__main__":
     res = calculate_stock_rising_value('000333', '2022-06-01', '2023-06-01')

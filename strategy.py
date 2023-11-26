@@ -627,7 +627,7 @@ class Strategy:
 
     @staticmethod
     def select_portfolio_conditions_by_rate(
-        valid_percent = 0.40, 
+        valid_percent = 0.33, 
         basic_ratio = 0.75, 
         inner_rate = 0.25, 
         sqlite_name = TEST_CONDITION_SQLITE3, 
@@ -737,19 +737,6 @@ if __name__ == "__main__":
             print('正在执行ROE选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_only_strategy_backtest_from_1991(roe_list=roe_list, period=period)
-            for key, value in sorted(res.items(), key=lambda x: x[0]):
-                print(key, '投资组合', f'共{len(value)}', '只股票')
-                stock_codes = []
-                for item in value:
-                    print(item)
-                    stock_codes.append(item[0][0:6])
-                start_date = str(int(key[1:5])+1)+'-06-01'
-                end_date = str(int(key[1:5])+2)+'-06-01'
-                res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
-                print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
-                res = utils.calculate_index_rising_value('000300', start_date, end_date)
-                print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
-                print('--'*50)
         elif msg.upper() == 'ROE-DIVIDEND':
             while True:
                 try:
@@ -775,19 +762,6 @@ if __name__ == "__main__":
             print('正在执行ROE-DIVIDEND选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_DIVIDEND_strategy_backtest_from_1991(roe_list=roe_list, period=period, dividend=dividend)
-            for key, value in sorted(res.items(), key=lambda x: x[0]):
-                print(key, '投资组合', f'共{len(value)}', '只股票')
-                stock_codes = []
-                for item in value:
-                    print(item)
-                    stock_codes.append(item[0][0:6])
-                start_date = str(int(key[1:5])+1)+'-06-01'
-                end_date = str(int(key[1:5])+2)+'-06-01'
-                res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
-                print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
-                res = utils.calculate_index_rising_value('000300', start_date, end_date)
-                print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
-                print('--'*50)
         elif msg.upper() == 'ROE-MOS':
             while True:
                 try:
@@ -810,19 +784,6 @@ if __name__ == "__main__":
             print('正在执行ROE-MOS选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_MOS_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range)
-            for key, value in sorted(res.items(), key=lambda x: x[0]):
-                print(key, '投资组合', f'共{len(value)}', '只股票')
-                stock_codes = []
-                for item in value:
-                    print(item)
-                    stock_codes.append(item[0][0:6])
-                start_date = str(int(key[1:5])+1)+'-06-01'
-                end_date = str(int(key[1:5])+2)+'-06-01'
-                res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
-                print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
-                res = utils.calculate_index_rising_value('000300', start_date, end_date)
-                print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
-                print('--'*50)
         elif msg.upper() == 'ROE-MOS-DIVIDEND':
             while True:
                 try:
@@ -852,21 +813,23 @@ if __name__ == "__main__":
             print('正在执行ROE-MOS-DIVIDEND选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range, dividend=dividend)
-            for key, value in sorted(res.items(), key=lambda x: x[0]):
-                print(key, '投资组合', f'共{len(value)}', '只股票')
-                stock_codes = []
-                for item in value:
-                    print(item)
-                    stock_codes.append(item[0][0:6])
-                start_date = str(int(key[1:5])+1)+'-06-01'
-                end_date = str(int(key[1:5])+2)+'-06-01'
-                res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
-                print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
-                res = utils.calculate_index_rising_value('000300', start_date, end_date)
-                print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
-                print('--'*50)
         elif msg.upper() == 'QUIT':
             break
         else:
             continue
+
+        # 显示细节
+        for key, value in sorted(res.items(), key=lambda x: x[0]):
+            print(key, '投资组合', f'共{len(value)}', '只股票')
+            stock_codes = []
+            for item in value:
+                print(item)
+                stock_codes.append(item[0][0:6])
+            start_date = str(int(key[1:5])+1)+'-06-01'
+            end_date = str(int(key[1:5])+2)+'-06-01'
+            res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
+            print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+            res = utils.calculate_index_rising_value('000300', start_date, end_date)
+            print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+            print('--'*50)
 
