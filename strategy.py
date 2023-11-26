@@ -179,9 +179,10 @@ class Strategy:
         """
         对测试结果和指数的收益对比进行综合评估,根据评估结果对测试条件加以储存和动态调整.
         评估方法: 对某个测试结果中每个时间组的组合和指数的收益率对比,并计算该测试结果的内在收益率.
-        某个测试结果战胜000300指数的比例为则basic_ration基本比率为0.如某个结果共10个有效时间组(valid_groups),战胜000300指数的次数为8次,
-        则basic_ration为0.8.选股组合的inner_rate内在收益率为各有效时间组组合总收益的复合收益率.
-        计算basic_ratio和inner_rate均使用有效时间组(valid_groups),即该时间组包含的股票数在5至25之间.
+        某个测试结果战胜000300指数的比例为0则basic_ration基本比率为0.如某个结果共10个有效时间组(valid_groups),
+        战胜000300指数的次数为8次,则basic_ration为0.8.选股组合的inner_rate内在收益率为各有效时间组组合总收益的复合收益率.
+        down_max为所有有效时间组中最大回测.计算basic_ratio、inner_rate、down_max
+        均使用有效时间组(valid_groups),即该时间组包含的股票数在5至25之间.
         :param test_condition: 测试条件,结构为{'strategy': 'ROE', 'test_condition': {...}}.
         :param test_result: 测试结果,策略类方法的返回值.
         :param portfolio_test_result: 测试结果和指数的收益对比,test_strategy_portfolio的返回值.
@@ -212,18 +213,22 @@ class Strategy:
         basic_ratio = win_count / len(valid_groups) if valid_groups else 0
         evaluate_result['basic_ratio'] = round(basic_ratio, 4)
 
-        # 计算inner_rate 
+        # 计算inner_rate 和 down_max
         # TODO:
         # 当时间组间隔不等于1年的情况下,是否需要调整？
+        rate_list = []
         total_return = 1
         for date, stocks in valid_groups.items():
             total_return *= (1 + portfolio_test_result[date][0])
+            rate_list.append(portfolio_test_result[date][0])
         inner_rate = total_return ** (1 / len(valid_groups)) - 1 if valid_groups else 0
         evaluate_result['inner_rate'] = round(inner_rate, 4)
+        evaluate_result['down_max'] = round(min(rate_list), 4) if valid_groups else 0
 
         # 调用calculate_score_of_test_condition计算综合评分score
         score = self.calculate_score_of_test_condition(
-            evaluate_result['inner_rate'], evaluate_result['valid_percent'], evaluate_result['basic_ratio']
+            evaluate_result['inner_rate'], evaluate_result['valid_percent'], 
+            evaluate_result['basic_ratio'], evaluate_result['down_max']
         )
         evaluate_result['score'] = score
 
@@ -242,7 +247,7 @@ class Strategy:
         如某个结果综合得分超过80分且valid_percent大于25%,则储存该组合的测试条件和相关评估信息到数据库.
         数据库内容:strategy、test_condition、total_groups(总时间组数目)、valid_groups(有效时间组数目)、
         valid_percent(有效时间组占比)、valid_groups_keys(有效时间组清单)、basci_ratio(对000300的胜率)
-        和inner_rate(内在收益率)、score(综合得分)、date(保存日期).
+        和inner_rate(内在收益率)、down_max(最大回撤)、score(综合得分)、date(保存日期).
         :param evaluate_result: 测试结果和指数收益对比的评估结果的返回值. 
         :param sqlite_file: 目标数据库文件路径,默认为TEST_CONDITION_SQLITE3.
         :param table_name: 目标数据库表名,默认为CONDITION_TABLE.
@@ -264,7 +269,8 @@ class Strategy:
                     valid_percent REAL, 
                     valid_groups_keys TEXT, 
                     basic_ratio REAL, 
-                    inner_rate REAL, 
+                    inner_rate REAL,
+                    down_max REAL, 
                     score REAL, 
                     date TEXT,
                     PRIMARY KEY(strategy, test_condition)
@@ -283,6 +289,7 @@ class Strategy:
                     valid_groups_keys,
                     basic_ratio,
                     inner_rate,
+                    down_max,
                     score,
                     date
                 )
@@ -296,6 +303,7 @@ class Strategy:
                     '{json.dumps(evaluate_result['valid_groups_keys'])}',
                     {evaluate_result['basic_ratio']},
                     {evaluate_result['inner_rate']},
+                    {evaluate_result['down_max']},
                     {evaluate_result['score']},
                     '{evaluate_result['date']}'
                 )
@@ -304,16 +312,21 @@ class Strategy:
             print('已保存测试条件到数据库!')
 
     @staticmethod
-    def calculate_score_of_test_condition(inner_rate: float, valid_percent: float, basic_ratio: float) -> float:
+    def calculate_score_of_test_condition(
+        inner_rate: float, valid_percent: float, basic_ratio: float, down_max: float
+    ) -> float:
         """
-        获取测试条件的评分,综合评分规则为:basic_ratio*0.35+inner_rate*0.6+valid_percent*0.05.
+        获取测试条件的评分,综合评分规则为:
+        basic_ratio*0.3+inner_rate*0.5+valid_percent*0.05+down_max*0.15
         inner_rate valid_percent basic_ratio最大得分均为100分.单项评分如下:
         inner_rate: [0.25-]:100分, [0.2-0.25]:90分, [0.15-0.2]:80分, [0.1-0.15]:70分, [0.06-0.1]:60分
         valid_percent: [0.7-]:100分, [0.6-0.7]:90分, [0.5-0.6]:80分, [0.4-0.5]:70分, [0.3-0.4]:60分
         basic_ratio: [0.85-]:100分, [0.8-0.85]:90分, [0.75-0.8]:80分, [0.7-0.75]:70分, [0.6-0.7]:60分
+        down_max: [0.00-]:100分, [-0.10-0.00]:90分, [-0.20--0.10]:80分, [-0.30--0.20]:70分, [--0.30]:60分
         :param inner_rate: 内在收益率
         :param valid_percent: 有效时间组占比
         :param basic_ratio: 对000300的胜率
+        :param down_max: 有效时间组最大回撤
         :return: 测试条件的评分
         """
         # 计算inner_rate的评分
@@ -358,8 +371,20 @@ class Strategy:
         else:
             basic_ratio_score = 0
 
+        # 计算down_max的评分
+        if down_max >= 0:
+            down_max_score = 100
+        elif down_max >= -0.1:
+            down_max_score = 90
+        elif down_max >= -0.2:
+            down_max_score = 80
+        elif down_max >= -0.3:
+            down_max_score = 70
+        else:
+            down_max_score = 60
+
         # 计算综合评分
-        score = inner_rate_score*0.6 + valid_percent_score*0.05 + basic_ratio_score*0.35
+        score = inner_rate_score*0.5 + valid_percent_score*0.05 + basic_ratio_score*0.30 + down_max_score*0.15
         return score
 
     def test_strategy_specific_condition(
@@ -629,7 +654,8 @@ class Strategy:
     def select_portfolio_conditions_by_rate(
         valid_percent = 0.33, 
         basic_ratio = 0.75, 
-        inner_rate = 0.25, 
+        inner_rate = 0.25,
+        down_max = -0.30, 
         sqlite_name = TEST_CONDITION_SQLITE3, 
         table_name = CONDITION_TABLE
     ) -> Union[pd.DataFrame, None]:
@@ -638,11 +664,10 @@ class Strategy:
         :param valid_percent: 最低有效时间组占比
         :param basic_ratio: 最低对000300的胜率
         :param inner_rate: 最低内在收益率
+        :param down_max: 最大回撤
         :param sqlite_name: sqlite3数据库文件名
         :param table_name: sqlite3数据库表名
         :return: 符合条件的测试条件集
-        NOTE:
-        三个指标值均位于0-1之间,表示实际取值.
         """
         con = sqlite3.connect(sqlite_name)
         with con:
@@ -650,7 +675,8 @@ class Strategy:
                 SELECT * FROM '{table_name}' 
                 WHERE valid_percent >= {valid_percent} 
                 AND basic_ratio >= {basic_ratio} 
-                AND inner_rate >= {inner_rate}            
+                AND inner_rate >= {inner_rate}
+                AND down_max >= {down_max}            
             """
             df = pd.read_sql_query(sql, con)
             if df.empty:
@@ -675,6 +701,7 @@ class Strategy:
         valid_percentile=50,
         basic_ratio_percentile=50,
         inner_rate_percentile=50,
+        down_max_percentile=50,
         sqlite_name=TEST_CONDITION_SQLITE3,
         table_name=CONDITION_TABLE
     ) -> Union[pd.DataFrame, None]:
@@ -683,12 +710,13 @@ class Strategy:
         :param valid_percentile: 最低有效时间组占比的百分位数
         :param basic_ratio_percentile: 最低对000300的胜率的百分位数
         :param inner_rate_percentile: 最低内在收益率的百分位数
+        :param down_max_percentile: 最大回撤的百分位数
         :param sqlite_name: sqlite3数据库文件名
         :param table_name: sqlite3数据库表名
         :return: 符合条件的测试条件集
         NOTE:
         本函数通过调用self.select_portfolio_conditions_by_rate函数实现.
-        三个指标百分位参数均位于0-100之间,如输入50,则表示获取中位数.
+        四个指标百分位参数均位于0-100之间,如输入50,则表示获取中位数.
         """
         con = sqlite3.connect(sqlite_name)
         with con:
@@ -702,6 +730,7 @@ class Strategy:
         valid_percent = np.percentile(df['valid_percent'], valid_percentile)
         basic_ratio = np.percentile(df['basic_ratio'], basic_ratio_percentile)
         inner_rate = np.percentile(df['inner_rate'], inner_rate_percentile)
+        down_max = np.percentile(df['down_max'], down_max_percentile)
         res = self.select_portfolio_conditions_by_rate(
             valid_percent=valid_percent,
             basic_ratio=basic_ratio,

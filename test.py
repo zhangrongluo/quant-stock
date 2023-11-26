@@ -71,7 +71,8 @@ def auto_test():
                         valid_percent REAL, 
                         valid_groups_keys TEXT, 
                         basic_ratio REAL, 
-                        inner_rate REAL, 
+                        inner_rate REAL,
+                        down_max REAL, 
                         score REAL, 
                         date TEXT,
                         PRIMARY KEY(strategy, test_condition)
