@@ -30,7 +30,7 @@ def get_IPO_date(code: str) -> str:
     df = pro.query('stock_basic', exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date')
     try:
         ipo_data = df[df['ts_code'] == full_code]['list_date'].values[0]
-        ipo_data = IPO_date[0:4] + '-' + IPO_date[4:6] + '-' + IPO_date[6:8]
+        ipo_data = ipo_data[0:4] + '-' + ipo_data[4:6] + '-' + ipo_data[6:8]
     except:
         ...
     return ipo_data
@@ -325,7 +325,7 @@ def update_ROE_indicators_table_from_1991(code: str):
                 last_roe = tmp.loc[0, 'roe']
         sql = f""" UPDATE '{ROE_TABLE}' SET {last_filed}=? WHERE stockcode=? """
         try:
-            con.execute(sql, (last_roe, stock_code))
+            con.execute(sql, (last_roe, full_code))
         except sqlite3.IntegrityError:
             ...
     print(f"{full_code}最新ROE数据更新成功." + " "*20 + '\r', end='', flush=True)

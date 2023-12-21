@@ -160,7 +160,7 @@ class Strategy:
                 end_date = str(int(date[1:5])+2)+'-06-01'
             else:
                 start_date = date
-                end_date_tmp = datetime.datetime.strptime(date, '%Y-%m-%d') + datetime.timedelta(days=days)
+                end_date_tmp = datetime.datetime.strptime(date, '%Y-%m-%d') + datetime.timedelta(days=183)
                 end_date = end_date_tmp.strftime('%Y-%m-%d')
             stock_return = utils.calculate_portfolio_rising_value(code_list, start_date, end_date)  # 获取组合的收益率
             test_result[date].append(stock_return)
