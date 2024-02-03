@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict, Union
 import tushare as ts
 import swindustry as sw
-from path import (INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, CURVE_TABLE, ROE_TABLE, TRADE_RECORD_PATH)
+from path import (INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, CURVE_TABLE, 
+                ROE_TABLE, TRADE_RECORD_PATH, INDEX_VALUE)
 
 def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     """
@@ -72,6 +73,57 @@ def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     inner_pb = average_roe_7/yield_value  # 计算mos_7
     mos_7 = 1 -pb/inner_pb
     return round(mos_7, 4)
+
+def calculate_index_MOS_from_2006(index: str, date: str) -> float:
+    """ 
+    计算000300 399006 000905指数的MOS值
+    :param index: 指数代码'000300', '399006', '000905'
+    :param date: 日期, 例如: '2019-01-01',不早于2006-03-01和记录最早日期的较大者
+    :return: 返回MOS值(1年)
+    NOTE:
+    roe值取自INDEX_VALUE数据库,以最接近当年4月30日roe_est值为准.
+    国债收益率取自curve数据库,pb值取自INDEX_VALUE数据库pb列.
+    """
+    date_regex = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    if not date_regex.match(date):
+        raise ValueError('参数date应为yyyy-mm-dd型字符串')
+    if index not in ['000300', '399006', '000905']:
+        raise ValueError('请检查指数代码是否正确(000300, 399006, 000905)')
+    full_code = f'{index}.SH' if index.startswith('000') else f'{index}.SZ'
+
+    con = sqlite3.connect(INDEX_VALUE)
+    with con:
+        sql = f"SELECT trade_date FROM '{full_code}' ORDER BY trade_date ASC LIMIT 1"
+        start_date = con.execute(sql).fetchone()[0]
+        start_date = datetime.datetime.strptime(start_date, '%Y%m%d').strftime('%Y-%m-%d')
+        if date < max([start_date, "2006-03-01"]):
+            date = max([start_date, "2006-03-01"])
+
+        # 获取和当年4月30日最接近的roe_est值
+        sql = f"SELECT * FROM '{full_code}' WHERE trade_date LIKE '{date[0:4]}%'"
+        df = pd.read_sql(sql, con)
+        df['trade_date'] = pd.to_datetime(df['trade_date'], format='%Y%m%d')
+        target_date = f"{date[0:4]}0430"
+        target_date = datetime.datetime.strptime(target_date, '%Y%m%d')
+        df['diff'] = df['trade_date'].apply(lambda x: abs(x-target_date).days)
+        df = df.sort_values(by='diff', ascending=True)
+        roe_est = df.iloc[0]['roe_est']
+
+        # 获取date日的指数pb值
+        date1 = "".join(date.split('-'))
+        sql = f"SELECT pb FROM '{full_code}' WHERE trade_date=?"
+        try:
+            pb = con.execute(sql, (date1, )).fetchone()[0]
+        except:
+            raise ValueError(f'未能获取{index}指数{date}pb值')
+
+    # 获取date参数指定的日期及附近的10年期国债收益率
+    row = find_closest_row_in_curve_table(date=date)  
+    yield_value = row['value1'].values[0]
+
+    inner_pb = roe_est*100/yield_value
+    mos = 1 - pb/inner_pb
+    return round(mos, 4)
 
 def calculate_index_rising_value(code: str, start_date: str, end_date: str) -> float:
     """
@@ -255,6 +307,67 @@ def save_whole_MOS_7_figure(code: str, dest: str, show_figure: bool = False):
     s = start_date.replace('-', '')
     e = end_date.replace('-', '')
     file_name = f"{code}-{s}-{e}.png"
+    dest_file = os.path.join(dest, file_name)
+    plt.savefig(dest_file)
+    print(f"已保存{dest_file}")
+    if show_figure:
+        plt.show()
+
+def save_whole_index_MOS_figure(index: str, dest: str, show_figure: bool = False):
+    """ 
+    绘制完整的MOS图形保存到指定目录.
+    开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
+    则以2006-03-01为最早日期.结束日期为交易记录的最晚日期.
+    :param index: 指数代码, 例如: '000300', '399006', '000905'
+    :param dest: 图形保存目录
+    :param show_figure: 是否显示图形
+    """
+    full_code = f'{index}.SH' if index.startswith('000') else f'{index}.SZ'
+    con = sqlite3.connect(INDEX_VALUE)
+    with con:
+        sql = f"SELECT * FROM '{full_code}' "
+        df = pd.read_sql(sql, con)
+        date_range = df['trade_date'].tolist()
+        date_range = [item for item in date_range if item >= '20060301']
+        date_range = [f"{item[0:4]}-{item[4:6]}-{item[6:8]}" for item in date_range][::-1]
+        start = date_range[0]
+        end = date_range[-1]
+    mos_list = []
+    for date in date_range:
+        tmp = calculate_index_MOS_from_2006(index=index, date=date)
+        mos_list.append(tmp)
+    plt.rcParams['font.sans-serif'] = ['Songti SC']  # 设置中文显示
+    plt.plot(date_range, mos_list)
+    plt.fill_between(date_range, mos_list, color='grey', alpha=0.1)
+    title = f"{full_code} MOS 曲线图(自 {start} 到 {end}) "
+    plt.title(title)
+    plt.xticks(
+        [date_range[0], date_range[len(date_range)//4], 
+        date_range[len(date_range)//2], 
+        date_range[len(date_range)//4*3], date_range[-1]]
+    )  # 设置x轴刻
+    plt.gca().yaxis.set_major_formatter(
+        plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
+    )  # 设置y轴刻度
+    max_mos = max(mos_list)  # 设置最高点和最低点
+    min_mos = min(mos_list)
+    max_date = date_range[mos_list.index(max_mos)]
+    min_date = date_range[mos_list.index(min_mos)]
+    plt.text(
+        max_date, max_mos, f"最高点: {max_mos:.2%}", ha='center', va='bottom', fontsize=12
+    )
+    plt.text(
+        min_date, min_mos, f"最低点: {min_mos:.2%}", ha='center', va='top', fontsize=12
+    )
+    plt.gca().yaxis.grid(True)  # 显示网格
+    fig = plt.gcf()
+    fig.set_size_inches(16, 10)
+
+    if not os.path.exists(dest):
+        os.mkdir(dest)
+    s = start.replace('-', '')
+    e = end.replace('-', '')
+    file_name = f"{index}-{s}-{e}.png"
     dest_file = os.path.join(dest, file_name)
     plt.savefig(dest_file)
     print(f"已保存{dest_file}")

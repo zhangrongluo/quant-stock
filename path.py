@@ -24,6 +24,7 @@ SW_INDUSTRY_XLS = os.path.join(ROOT_PATH, "stock-list", "sw-stock-list.xlsx")  #
 INDICATOR_ROE_FROM_1991 = os.path.join(ROOT_PATH, "data-package", "indicator-roe-from-1991.sqlite3")  # ROE数据文件
 CURVE_SQLITE3 = os.path.join(ROOT_PATH, "data-package", "curve.sqlite3")  # 国债收益率曲线数据文件
 TEST_CONDITION_SQLITE3 = os.path.join(ROOT_PATH, "test-condition", "test-condition.sqlite3")  # 测试条件数据文件
+INDEX_VALUE = os.path.join(ROOT_PATH, "data-package", "index-value.sqlite3")  # 指数数据文件
 
 if not os.path.exists(SW_INDUSTRY_XLS):
     raise FileNotFoundError(f"未在{SW_INDUSTRY_PATH}发现申万行业分类清单文件,请检查.")

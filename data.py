@@ -16,7 +16,8 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import tushare as ts
 import swindustry as sw
-from path import TRADE_RECORD_PATH, INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, ROE_TABLE, CURVE_TABLE
+from path import (TRADE_RECORD_PATH, INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, ROE_TABLE, 
+                CURVE_TABLE, INDEX_VALUE)
 
 def get_IPO_date(code: str) -> str:
     """
@@ -158,6 +159,58 @@ def create_curve_value_table(days: int):
         df = df[df['value1'] != 0]  # 去除value1为0的行
         df.drop_duplicates(subset=['date1'], keep='last', inplace=True)
         df.to_sql(name=CURVE_TABLE, con=con, index=False, if_exists='replace')
+
+def create_index_indicator_table(index: str='000300'):
+    """
+    创建指数估值数据库,用以计算指数MOS_7
+    :param index: '000300' or '000905' or '399006'
+    NOTE:
+    数据期间从20040101开始至今日(tushare接口限制)
+    数据库名称为INDEX_VALUE,表名为000300.SH, 000905.SH, 399006.SH
+    指标包括ts_code,trade_date,pb,pe,turnover_rate,pe_ttm,turnover_rate_f
+    NOTE:
+    此外再加一个roe预估数=pb/pe
+    """
+    if index not in ['000300', '000905', '399006']:
+        raise ValueError('请检查指数代码是否正确[000300, 000905, 399006]')
+    full_code = index + '.SH' if index.startswith('000') else index + '.SZ'
+    start_date = '20040101'
+    end_date = time.strftime('%Y%m%d', time.localtime(time.time()))
+    date_list = pd.date_range(start_date, end_date).strftime("%Y%m%d")[::-1]  # 生成日期序列
+
+    con = sqlite3.connect(INDEX_VALUE)
+    with con:
+        sql = f"""
+            DROP TABLE IF EXISTS '{full_code}'
+        """
+        con.executescript(sql)  # 首先删除表格清空
+
+        sql = f"""
+            CREATE TABLE IF NOT EXISTS '{full_code}' (
+            ts_code TEXT NOT NULL,
+            trade_date TEXT NOT NULL,
+            pb REAL DEFAULT 0,
+            pe REAL DEFAULT 0,
+            pe_ttm REAL DEFAULT 0,
+            turnover_rate REAL DEFAULT 0,
+            turnover_rate_f REAL DEFAULT 0,
+            roe_est REAL DEFAULT 0
+        )"""
+        con.executescript(sql)  # 创建表格
+
+        # 按照步长3000遍历日期序列,获取数据
+        pro = ts.pro_api()
+        for i in range(0, len(date_list), 3000):
+            part_date_list = date_list[i:i+3000]
+            df = pro.index_dailybasic(ts_code=full_code, 
+            start_date=part_date_list[-1], end_date=part_date_list[0], 
+            fields='ts_code,trade_date,pb,pe,pe_ttm,turnover_rate,turnover_rate_f')
+            df.drop_duplicates(subset=['trade_date'], keep='last', inplace=True)
+            try:
+                df['roe_est'] = (df['pb'] / df['pe']).apply(lambda x: round(x, 4))  # 保留四位小数
+            except ZeroDivisionError:
+                df['roe_est'] = 0.0000
+            df.to_sql(name=full_code, con=con, index=False, if_exists='append')
 
 def create_trade_record_csv_table(code: str, rm_empty_rows: bool = False) -> None:
     """
@@ -393,7 +446,7 @@ if __name__ == '__main__':
         print('-------------------------操作提示-------------------------')
         print('Create-Trade-CSV      Create-Curve       Create-Roe-Table')
         print('Update-Trade-CSV      Update-Curve       Update-ROE-Table')
-        print('Quit                                                     ')
+        print('Create-Index-Value                       Quit            ')
         print('---------------------------------------------------------')
         msg = input('>>>> 请选择操作提示 >>>>  ')
         if msg.upper()  == 'QUIT':
@@ -432,5 +485,10 @@ if __name__ == '__main__':
             with ThreadPoolExecutor() as pool:
                 pool.map(update_ROE_indicators_table_from_1991, stocks)
             print('indicators表格更新成功.'+ ' '*20)
+        elif msg.upper() == 'CREATE-INDEX-VALUE':
+            print('正在创建指数估值数据库,请稍等...\r', end='', flush=True)
+            for index in ["000300", "000905", "399006"]:
+                create_index_indicator_table(index)
+            print('指数估值数据库创建成功.'+ ' '*20)
         else:
             continue
