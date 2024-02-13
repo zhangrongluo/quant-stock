@@ -20,7 +20,7 @@ from path import TEST_CONDITION_SQLITE3
 import threading
 import platform
 
-semaphore = threading.Semaphore(3)
+semaphore = threading.Semaphore(5)
 scheduler = BackgroundScheduler()
 thread = threading.Thread(target=auto_test)
 codes = [item[0][0:6] for item in sw.get_all_stocks()]
@@ -41,6 +41,14 @@ def update_curve_sqlite3():
         print('开始更新curve.sqlite3\r', end='', flush=True)
         data.update_curve_value_table()
         print('更新curve.sqlite3完成.' + ' '*20, flush=True)
+
+# 每日下午6点30分开始更新一次inddex_value.sqlite3
+@scheduler.scheduled_job('cron', hour=18, minute=30)
+def update_index_value_sqlite3():
+    with semaphore:
+        print('开始更新index_value.sqlite3\r', end='', flush=True)
+        data.create_index_indicator_table()
+        print('更新index_value.sqlite3完成.' + ' '*20, flush=True)
 
 # 每周五上午7点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
 # 本地仓库路径: /Users/zhangrongluo/Desktop/pythonzone/win-stock-conditions/win-stock-conditions
