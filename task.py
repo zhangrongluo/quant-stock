@@ -16,7 +16,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import swindustry as sw
 import data
 from test import auto_test
-from path import TEST_CONDITION_SQLITE3
+from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH
 import threading
 import platform
 
@@ -42,12 +42,13 @@ def update_curve_sqlite3():
         data.update_curve_value_table()
         print('更新curve.sqlite3完成.' + ' '*20, flush=True)
 
-# 每日下午6点30分开始更新一次inddex_value.sqlite3
+# 每日下午6点30分开始更新一次index_value.sqlite3
 @scheduler.scheduled_job('cron', hour=18, minute=30)
 def update_index_value_sqlite3():
     with semaphore:
         print('开始更新index_value.sqlite3\r', end='', flush=True)
-        data.create_index_indicator_table()
+        for index in ["000300", "000905", "399006"]:
+            data.create_index_indicator_table(index)
         print('更新index_value.sqlite3完成.' + ' '*20, flush=True)
 
 # 每周五上午7点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
@@ -58,8 +59,7 @@ def copy_test_condition_sqlite3():
     with semaphore:
         if "iMac" in platform.uname().node:  # 如果是在imac机器上
             print('开始拷贝TEST_CONDITION_SQLITE3\r', end='', flush=True)
-            des_path = "/Users/zhangrongluo/Desktop/pythonzone/win-stock-conditions/win-stock-conditions"  # 本地仓库路径
-            shutil.copyfile(TEST_CONDITION_SQLITE3, os.path.join(des_path, "test-condition-quant.sqlite3"))
+            shutil.copyfile(TEST_CONDITION_SQLITE3, os.path.join(IMAC_REPOSITORY_PATH, "test-condition-quant.sqlite3"))
             print('拷贝TEST_CONDITION_SQLITE3完成.' + ' '*20, flush=True)
 
 # 每年5月1日上午2点更新一次indicator-roe-from-1991.sqlite3

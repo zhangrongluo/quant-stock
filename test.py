@@ -6,7 +6,8 @@ from path import TEST_CONDITION_SQLITE3, CONDITION_TABLE
 import threading
 
 lock = threading.Lock()
-# quant-stock系统所有测试条件保存在test-condition.sqlite3数据库中,每个年份一个表,用于保存该年度的全部测试条件,表名格式为condition-年份.
+# quant-stock系统所有测试条件保存在test-condition.sqlite3数据库中,
+# 每个年份一个表,用于保存该年度的全部测试条件,表名格式为condition-年份.
 # 每年的1-5月生成的测试条件保存在上年的表中,比如2023年1-5月生成的测试条件保存在condition-2022表中.
 # 每年的6-12月生成的测试条件保存在当年的表中,比如2023年6-12月生成的测试条件保存在condition-2023表中.
 
@@ -45,6 +46,9 @@ def has_test_previous_year() -> bool:
 def auto_test():
     """
     自动测试函数.
+    每年6月份建立年度表格CONDITION_TABLE,并重新测试以前年度的全部测试条件,
+    完成重新测试动作以后,本函数开始随机测试新生成的测试条件.
+    无限循环流程,断线后自动重连.
     """
     case = Strategy()
     while True:
@@ -80,15 +84,23 @@ def auto_test():
                 """
                 con.execute(sql)
 
-                # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数,并保存结果到condition-2023表中.
+                # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数,
+                # 并保存结果到CONDITION_TABLE表中.
                 if has_test_previous_year() is False:
                     # 获取以前年度表格的表名(不包含当年的表)
                     df = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table"', con)
                     all_table_names = df['name'].tolist()
-                    prev_table_names = [table for table in all_table_names if str(now.tm_year) not in table and table != 'flag']
+                    prev_table_names = [
+                        table for table in all_table_names if str(now.tm_year) not in table and table != 'flag'
+                    ]
 
                     for prev_table in prev_table_names:
-                        case.retest_conditions_from_sqlite3(src_sqlite3=TEST_CONDITION_SQLITE3, src_table=prev_table, dest_sqlite3=TEST_CONDITION_SQLITE3, dest_table=CONDITION_TABLE)
+                        case.retest_conditions_from_sqlite3(
+                            src_sqlite3=TEST_CONDITION_SQLITE3, 
+                            src_table=prev_table, 
+                            dest_sqlite3=TEST_CONDITION_SQLITE3, 
+                            dest_table=CONDITION_TABLE
+                        )
 
                     # 如果没有当年的flag记录,则插入当年的flag值为Yes
                     sql = f"""
@@ -103,7 +115,10 @@ def auto_test():
                     con.execute(sql)
         with lock:
             try:
-                case.test_strategy_random_condition(sqlite_file=TEST_CONDITION_SQLITE3, table_name=CONDITION_TABLE)
+                case.test_strategy_random_condition(
+                    sqlite_file=TEST_CONDITION_SQLITE3, 
+                    table_name=CONDITION_TABLE
+                )
                 time.sleep(10)
             except Exception as e:
                 print(f"auto_test()函数出现异常:{e}")
