@@ -743,17 +743,22 @@ class Strategy:
     @staticmethod
     def comprehensive_sorting_test_condition_sqlite3(
         sqlite_name=TEST_CONDITION_SQLITE3,
-        table_name=CONDITION_TABLE
+        table_name=CONDITION_TABLE,
+        riskmode=0
     ) -> Union[pd.DataFrame, None]:
         """ 
         综合排序测试条件数据库,按照综合得分进行排序.排序方法如下:
-        以down_max inner_rate basic_ratio字段为排序基础(重要性依次降低)
-        对down_max进行降序排列,排第一位的行赋值为1,第二位赋值为2,以此类推(权重为1)
-        对inner_rate进行降序排列,排第一位的行赋值为1,第二位赋值为2,以此类推(权重为1.5)
-        对basic_ratio进行降序排列,排第一位的行赋值为1,第二位赋值为2,以此类推(权重为2)
+        以down_max inner_rate basic_ratio字段为排序基础
+        对down_max进行降序排列,排第一位的行赋值为1,第二位赋值为2,以此类推
+        对inner_rate进行降序排列,排第一位的行赋值为1,第二位赋值为2,以此类推
+        对basic_ratio进行降序排列,排第一位的行赋值为1,第二位赋值为2,以此类推
         对上述三个字段的排名求和,得到一个新的字段,按照新字段进行升序排列(得分低者为优先选项).
         :param sqlite_name: sqlite3数据库文件名
         :param table_name: sqlite3数据库表名
+        :param riskmode: 默认为0,风险优先模式,1为收益优先模式,2为均衡模式.
+            在风险优先模式下,down_max的权重为2,inner_rate的权重为1.5, basic_ratio的权重为1
+            在收益优先模式下,down_max的权重为1.5,inner_rate的权重为2, basic_ratio的权重为1
+            在均衡模式下,down_max的权重为1,inner_rate的权重为1, basic_ratio的权重为1
         :return: 综合排序后的条件集(strategy test_conditon valid_groups_keys 
         basic_ratio inner_rate down_max sum_rank date)
         """
@@ -765,11 +770,18 @@ class Strategy:
             df = pd.read_sql_query(sql, con)
             if df.empty:
                 return
-
+            
+            # 根据riskmode设置权重
+            if riskmode == 0:
+                risk_w, return_w, basic_w = (2, 1.5, 1)
+            elif riskmode == 1:
+                risk_w, return_w, basic_w = (1.5, 2, 1)
+            elif riskmode == 2:
+                risk_w, return_w, basic_w = (1, 1, 1)
             df['down_max_rank'] = df['down_max'].rank(ascending=False)
             df['inner_rate_rank'] = df['inner_rate'].rank(ascending=False)
             df['basic_ratio_rank'] = df['basic_ratio'].rank(ascending=False)
-            df['sum_rank'] = df['down_max_rank'] + df['inner_rate_rank']*1.5 + df['basic_ratio_rank']*2
+            df['sum_rank'] = df['down_max_rank']*risk_w + df['inner_rate_rank']*return_w + df['basic_ratio_rank']*basic_w
             df = df.sort_values(by='sum_rank', ascending=True).reset_index(drop=True)
             df =  df[['strategy', 'test_condition', 'valid_groups_keys', 'basic_ratio', 'inner_rate', 
                 'down_max', 'sum_rank', 'date']]
