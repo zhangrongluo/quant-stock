@@ -19,19 +19,8 @@ def has_test_previous_year() -> bool:
     如果flag字段为Yes,则表示已经测试过以前年度的测试条件,否则为No.
     :return: True or False
     """
-
     con = sqlite3.connect(TEST_CONDITION_SQLITE3)
     with con:
-        sql = """
-            CREATE TABLE IF NOT EXISTS flag
-            (
-                year TEXT,
-                flag TEXT,
-                PRIMARY KEY(year)
-            )
-        """
-        con.execute(sql)
-
         # 获取当年的flag值
         sql = f"""
             SELECT flag FROM flag WHERE year='{time.localtime().tm_year}'
@@ -50,40 +39,49 @@ def auto_test():
     完成重新测试动作以后,本函数开始随机测试新生成的测试条件.
     无限循环流程,断线后自动重连.
     """
+    con = sqlite3.connect(TEST_CONDITION_SQLITE3)
+    with con:
+        sql = """
+            CREATE TABLE IF NOT EXISTS flag
+            (
+                year TEXT,
+                flag TEXT,
+                PRIMARY KEY(year)
+            )
+        """
+        con.execute(sql)
+        sql = f"""
+            CREATE TABLE IF NOT EXISTS '{CONDITION_TABLE}'
+            (
+                strategy TEXT, 
+                test_condition TEXT, 
+                total_groups INTEGER, 
+                valid_groups INTEGER, 
+                valid_percent REAL, 
+                valid_groups_keys TEXT, 
+                basic_ratio REAL, 
+                inner_rate REAL,
+                down_max REAL, 
+                score REAL, 
+                date TEXT,
+                PRIMARY KEY(strategy, test_condition)
+            )
+        """
+        con.execute(sql)
+    
     case = Strategy()
     while True:
         now = time.localtime()
-        if now.tm_mon in [1, 2, 3, 4, 5]:
-            # 设置当年的flag值为No
-            con = sqlite3.connect(TEST_CONDITION_SQLITE3)
-            with con:
+        # 第一步 重新检测以前年度的全部测试条件
+        con = sqlite3.connect(TEST_CONDITION_SQLITE3)
+        with con:
+            if now.tm_mon in [1, 2, 3, 4, 5]:
+                # 设置当年的flag值为No
                 sql = f"""
                     INSERT OR IGNORE INTO flag (year, flag) VALUES ('{time.localtime().tm_year}', 'No')
                 """
                 con.execute(sql)
-        elif now.tm_mon in [6, 7, 8, 9, 10, 11, 12]:
-            # 创建年度表格
-            con = sqlite3.connect(TEST_CONDITION_SQLITE3)
-            with con:
-                sql = f"""
-                    CREATE TABLE IF NOT EXISTS '{CONDITION_TABLE}'
-                    (
-                        strategy TEXT, 
-                        test_condition TEXT, 
-                        total_groups INTEGER, 
-                        valid_groups INTEGER, 
-                        valid_percent REAL, 
-                        valid_groups_keys TEXT, 
-                        basic_ratio REAL, 
-                        inner_rate REAL,
-                        down_max REAL, 
-                        score REAL, 
-                        date TEXT,
-                        PRIMARY KEY(strategy, test_condition)
-                    )
-                """
-                con.execute(sql)
-
+            else:  # now.tm_mon in [6, 7, 8, 9, 10, 11, 12]:
                 # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数,
                 # 并保存结果到CONDITION_TABLE表中.
                 if has_test_previous_year() is False:
@@ -93,7 +91,6 @@ def auto_test():
                     prev_table_names = [
                         table for table in all_table_names if str(now.tm_year) not in table and table != 'flag'
                     ]
-
                     for prev_table in prev_table_names:
                         case.retest_conditions_from_sqlite3(
                             src_sqlite3=TEST_CONDITION_SQLITE3, 
@@ -101,18 +98,12 @@ def auto_test():
                             dest_sqlite3=TEST_CONDITION_SQLITE3, 
                             dest_table=CONDITION_TABLE
                         )
-
-                    # 如果没有当年的flag记录,则插入当年的flag值为Yes
-                    sql = f"""
-                        INSERT OR IGNORE INTO flag (year, flag) VALUES ('{time.localtime().tm_year}', 'Yes')
-                    """
-                    con.execute(sql)
-
                     # 更新当年的flag值为Yes
                     sql = f"""
                         UPDATE flag SET flag='Yes' WHERE year='{time.localtime().tm_year}'
                     """
                     con.execute(sql)
+        # 第二步 随机测试新生成的测试条件
         with lock:
             try:
                 case.test_strategy_random_condition(
