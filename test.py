@@ -8,8 +8,8 @@ import threading
 lock = threading.Lock()
 # quant-stock系统所有测试条件保存在test-condition.sqlite3数据库中,
 # 每个年份一个表,用于保存该年度的全部测试条件,表名格式为condition-年份.
-# 每年的1-5月生成的测试条件保存在上年的表中,比如2023年1-5月生成的测试条件保存在condition-2022表中.
-# 每年的6-12月生成的测试条件保存在当年的表中,比如2023年6-12月生成的测试条件保存在condition-2023表中.
+# 每年的1-4月生成的测试条件保存在上年的表中,比如2023年1-4月生成的测试条件保存在condition-2022表中.
+# 每年的5-12月生成的测试条件保存在当年的表中,比如2023年5-12月生成的测试条件保存在condition-2023表中.
 
 def has_test_previous_year() -> bool:
     """
@@ -35,7 +35,7 @@ def has_test_previous_year() -> bool:
 def auto_test():
     """
     自动测试函数.
-    每年6月份建立年度表格CONDITION_TABLE,并重新测试以前年度的全部测试条件,
+    每年5月份建立年度表格CONDITION_TABLE,并重新测试以前年度的全部测试条件,
     完成重新测试动作以后,本函数开始随机测试新生成的测试条件.
     无限循环流程,断线后自动重连.
     """
@@ -75,13 +75,13 @@ def auto_test():
         # 第一步 重新检测以前年度的全部测试条件
         con = sqlite3.connect(TEST_CONDITION_SQLITE3)
         with con:
-            if now.tm_mon in [1, 2, 3, 4, 5]:
+            if now.tm_mon in [1, 2, 3, 4]:
                 # 设置当年的flag值为No
                 sql = f"""
                     INSERT OR IGNORE INTO flag (year, flag) VALUES ('{time.localtime().tm_year}', 'No')
                 """
                 con.execute(sql)
-            else:  # now.tm_mon in [6, 7, 8, 9, 10, 11, 12]:
+            else:  # now.tm_mon in [5, 6, 7, 8, 9, 10, 11, 12]:
                 # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数,
                 # 并保存结果到CONDITION_TABLE表中.
                 if has_test_previous_year() is False:
