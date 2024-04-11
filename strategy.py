@@ -797,17 +797,21 @@ if __name__ == "__main__":
         if msg.upper() == 'ROE':
             while True:
                 try:
-                    roe_value = float(input('>>>> 请输入roe筛选值(数字型) <<<< '))
+                    roe_value = float(input('>>>> 请输入roe筛选值(数字型, 999999重新选择策略) <<<< '))
                     break
                 except:
                     ...
+            if roe_value == 999999:
+                continue
             while True:
                 try:
-                    period = int(input('>>>> 请输入时间跨度(整数型5-10之间) <<<< '))
-                    if 10 >= period >= 5:
+                    period = int(input('>>>> 请输入时间跨度(整数型5-10之间, 999999重新选择策略) <<<< '))
+                    if 10 >= period >= 5 or period == 999999:
                         break
                 except:
                     ...
+            if period == 999999:  # 双点退出
+                continue
             roe_list = [roe_value]*period
             print('正在执行ROE选股策略,请稍等......')
             print('++'*50)
@@ -815,38 +819,48 @@ if __name__ == "__main__":
         elif msg.upper() == 'ROE-DIVIDEND':
             while True:
                 try:
-                    roe_value = float(input('>>>> 请输入roe筛选值(数字型) <<<< '))
+                    roe_value = float(input('>>>> 请输入roe筛选值(数字型, 999999重新选择策略) <<<< '))
                     break
                 except:
                     ...
+            if roe_value == 999999:
+                continue
             while True:
                 try:
-                    period = int(input('>>>> 请输入时间跨度(整数型5-10之间) <<<< '))
-                    if 10 >= period >= 5:
+                    period = int(input('>>>> 请输入时间跨度(整数型5-10之间, 999999重新选择策略) <<<< '))
+                    if 10 >= period >= 5 or period == 999999:
                         break
                 except:
                     ...
+            if period == 999999:
+                continue
             roe_list = [roe_value]*period
             while True:
                 try:
-                    dividend = float(input('>>>> 请输入股息率筛选值(数字型) <<<< '))
+                    dividend = float(input('>>>> 请输入股息率筛选值(数字型, 999999重新选择策略) <<<< '))
                     if dividend >= 0:
                         break
                 except:
                     ...
+            if dividend == 999999:
+                continue
             print('正在执行ROE-DIVIDEND选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_DIVIDEND_strategy_backtest_from_1991(roe_list=roe_list, period=period, dividend=dividend)
         elif msg.upper() == 'ROE-MOS':
             while True:
                 try:
-                    roe_value = float(input('>>>> 请输入roe筛选值(数字型) <<<< '))
+                    roe_value = float(input('>>>> 请输入roe筛选值(数字型, 999999重新选择策略) <<<< '))
                     break
                 except:
                     ...
+            if roe_value == 999999:
+                continue
             roe_list = [roe_value] * 7
             while True:
-                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a,b形式,ab均为数字型) <<<< ')
+                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a,b形式,ab均为数字型, 999999重新选择策略) <<<< ')
+                if mos_tmp == '999999':
+                    break
                 mos_list = mos_tmp.split(',')
                 try:
                     a = float(mos_list[0])
@@ -856,19 +870,25 @@ if __name__ == "__main__":
                         break
                 except:
                     ...
+            if mos_tmp == '999999':  # 双点退出
+                continue
             print('正在执行ROE-MOS选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_MOS_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range)
         elif msg.upper() == 'ROE-MOS-DIVIDEND':
             while True:
                 try:
-                    roe_value = float(input('>>>> 请输入roe筛选值(数字型) <<<< '))
+                    roe_value = float(input('>>>> 请输入roe筛选值(数字型, 999999重新选择策略) <<<< '))
                     break
                 except:
                     ...
+            if roe_value == 999999:
+                continue
             roe_list = [roe_value] * 7
             while True:
-                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a,b形式,ab均为数字型) <<<< ')
+                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a,b形式,ab均为数字型, 999999重新选择策略) <<<< ')
+                if mos_tmp == '999999':
+                    break
                 mos_list = mos_tmp.split(',')
                 try:
                     a = float(mos_list[0])
@@ -878,13 +898,17 @@ if __name__ == "__main__":
                         break
                 except:
                     ...
+            if mos_tmp == '999999':  # 双点退出
+                continue
             while True:
                 try:
-                    dividend = float(input('>>>> 请输入股息率筛选值(数字型) <<<< '))
+                    dividend = float(input('>>>> 请输入股息率筛选值(数字型, 999999重新选择策略) <<<< '))
                     if dividend >= 0:
                         break
                 except:
                     ...
+            if dividend == 999999:
+                continue
             print('正在执行ROE-MOS-DIVIDEND选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range, dividend=dividend)
