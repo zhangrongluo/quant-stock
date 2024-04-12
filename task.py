@@ -30,8 +30,14 @@ codes = [item[0][0:6] for item in sw.get_all_stocks()]
 def update_trade_record_csv():
     with semaphore:
         print('开始更新trade record csv文件\r', end='', flush=True)
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            executor.map(data.update_trade_record_csv, codes)
+        while True:
+            try:  # 线程池中断后重新更新直到全部更新完成
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    executor.map(data.update_trade_record_csv, codes)
+                break
+            except Exception as e:
+                print(f"更新trade record文件出错,原因:{e}" + ' '*20, flush=True)
+                continue
         print('更新trade record csv文件完成.' + ' '*20, flush=True)
 
 # 每日下午6点30分开始更新一次curve.sqlite3
