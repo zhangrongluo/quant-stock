@@ -16,7 +16,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import swindustry as sw
 import data
 from test import auto_test
-from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH
+from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH, CONDITION_TABLE
 import threading
 import platform
 
@@ -61,6 +61,32 @@ def copy_test_condition_sqlite3():
             print('开始拷贝TEST_CONDITION_SQLITE3\r', end='', flush=True)
             shutil.copyfile(TEST_CONDITION_SQLITE3, os.path.join(IMAC_REPOSITORY_PATH, "test-condition-quant.sqlite3"))
             print('拷贝TEST_CONDITION_SQLITE3完成.' + ' '*20, flush=True)
+
+# 每年4月30日下午6点0分开始,将src中CONDITION_TABLE表中的数据复制到
+# dest中的CONDITION_TABLE+“from-win"表中,覆盖原有数据,合并测试条件
+src = "/Users/zhangrongluo/Desktop/win-stock/tmp-file/test-condition.sqlite3"
+dest = "/Users/zhangrongluo/Desktop/quant-stock/test-condition/test-condition.sqlite3"
+@scheduler.scheduled_job('cron', month=4, day=30, hour=18, minute=0)
+def copy_condition_table():
+    with semaphore:
+        print('开始复制test-condition.sqlite3\r', end='', flush=True)
+        con = sqlite3.connect(src)
+        with con:
+            sql = f"""
+                ATTACH DATABASE '{dest}' AS dest
+            """
+            con.execute(sql)
+            sql = f"""
+                CREATE TABLE IF NOT EXISTS dest.'{CONDITION_TABLE}-from-win'
+                AS
+                SELECT * FROM '{CONDITION_TABLE}'
+            """
+            con.execute(sql)
+            sql = f"""
+                DETACH DATABASE dest
+            """
+            con.execute(sql)
+            print('复制完成.' + ' '*20, flush=True)
 
 # 每年5月1日上午2点更新一次indicator-roe-from-1991.sqlite3
 @scheduler.scheduled_job('cron', month=5, day=1, hour=2, minute=0)
