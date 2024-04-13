@@ -416,19 +416,29 @@ class Strategy:
             print(result)
         
         # 测试该测试结果和指数的收益对比
-        portfolio_test_result = self.test_strategy_portfolio(strategy=strategy, result=result, index_list=['000300'])
+        portfolio_test_result = self.test_strategy_portfolio(
+            strategy=strategy, result=result, index_list=['000300']
+        )
         if display:
             print('+'*120)
             print(portfolio_test_result)
         
         # 测试该测试结果的评估
-        evaluate_result = self.evaluate_portfolio_effect(condition, result, portfolio_test_result)
+        evaluate_result = self.evaluate_portfolio_effect(
+            test_condition=condition, 
+            test_result=result, 
+            portfolio_test_result=portfolio_test_result
+        )
         if display:
             print('+'*120)
             print(evaluate_result)
         
         # 将该测试结果保存到数据库
-        self.save_strategy_to_sqlite3(evaluate_result, sqlite_file, table_name)
+        self.save_strategy_to_sqlite3(
+            evaluate_result=evaluate_result, 
+            sqlite_file=sqlite_file, 
+            table_name=table_name
+        )
 
     def test_strategy_random_condition(
         self, 
@@ -459,7 +469,10 @@ class Strategy:
                 print(condition_list)
             for condition in condition_list:  # 测试
                 print(f'测试条件：{condition}'.ljust(120, ' '))
-                self.test_strategy_specific_condition(condition=condition, display=display, sqlite_file=sqlite_file, table_name=table_name)
+                self.test_strategy_specific_condition(
+                    condition=condition, display=display, 
+                    sqlite_file=sqlite_file, table_name=table_name
+                )
         end = time.time()
         print('+'*120)
         print(f'共测试{number}次，耗时{round(end-start, 4)}秒')
@@ -503,12 +516,19 @@ class Strategy:
         :param dest_table: 保存测试结果的sqlite3数据库中的表名
         :return: None
         """
-        conditions = self.get_conditions_from_sqlite3(src_sqlite3=src_sqlite3, src_table=src_table)
+        conditions = self.get_conditions_from_sqlite3(
+            src_sqlite3=src_sqlite3, src_table=src_table
+        )
         for condition in conditions:  # 重新测试
-            tmp_conditons = self.get_conditions_from_sqlite3(src_sqlite3=dest_sqlite3, src_table=dest_table)
+            tmp_conditons = self.get_conditions_from_sqlite3(
+                src_sqlite3=dest_sqlite3, src_table=dest_table
+            )
             if condition not in tmp_conditons:
                 print(f'测试条件：{condition}'.ljust(120, ' '))
-                self.test_strategy_specific_condition(condition=condition, display=False, sqlite_file=dest_sqlite3, table_name=dest_table)
+                self.test_strategy_specific_condition(
+                    condition=condition, display=False, 
+                    sqlite_file=dest_sqlite3, table_name=dest_table
+                )
     
     @staticmethod
     def ROE_only_strategy_backtest_from_1991(roe_list:List=[20]*5, roe_value=None, period:int=5) -> Dict:
