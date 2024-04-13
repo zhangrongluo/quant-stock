@@ -10,13 +10,15 @@ auto_test全时段运行,使用threading.Semaphore和threading.Lock处理线程�
 import os
 import time
 import shutil
+import sqlite3
+import pandas as pd
 import datetime
 from concurrent.futures import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 import swindustry as sw
 import data
 from test import auto_test
-from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH, CONDITION_TABLE
+from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH
 import threading
 import platform
 
@@ -68,32 +70,27 @@ def copy_test_condition_sqlite3():
             shutil.copyfile(TEST_CONDITION_SQLITE3, os.path.join(IMAC_REPOSITORY_PATH, "test-condition-quant.sqlite3"))
             print('拷贝TEST_CONDITION_SQLITE3完成.' + ' '*20, flush=True)
 
-# 每年4月30日下午6点0分开始,将src中CONDITION_TABLE表中的数据复制到
-# dest中的CONDITION_TABLE+“from-win"表中,覆盖原有数据,合并测试条件
+# 每年4月20日下午6点0分开始,将src中table_name表中的数据复制到
+# dest中的table_name+“from-win"表中,如果dest中已经存在table_name+“from-win"表,
+# 则覆盖原有表,如果dest中不存在table_name+“from-win"表,则新建表.
 src = "/Users/zhangrongluo/Desktop/win-stock/tmp-file/test-condition.sqlite3"
 dest = "/Users/zhangrongluo/Desktop/quant-stock/test-condition/test-condition.sqlite3"
-@scheduler.scheduled_job('cron', month=4, day=30, hour=18, minute=0)
+@scheduler.scheduled_job('cron', month=4, day=20, hour=18, minute=0)
 def copy_condition_table():
     with semaphore:
         print('开始复制test-condition.sqlite3\r', end='', flush=True)
-        con = sqlite3.connect(src)
-        with con:
+        now = time.localtime()
+        table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
+        con_src = sqlite3.connect(src)
+        con_dest = sqlite3.connect(dest)
+        with con_src:
             sql = f"""
-                ATTACH DATABASE '{dest}' AS dest
+                SELECT * FROM '{table_name}'
             """
-            con.execute(sql)
-            sql = f"""
-                CREATE TABLE IF NOT EXISTS dest.'{CONDITION_TABLE}-from-win'
-                AS
-                SELECT * FROM '{CONDITION_TABLE}'
-            """
-            con.execute(sql)
-            sql = f"""
-                DETACH DATABASE dest
-            """
-            con.execute(sql)
-            print('复制完成.' + ' '*20, flush=True)
-
+            df = pd.read_sql(sql, con_src)
+            df.to_sql(f'{table_name}-from-win', con_dest, if_exists='replace', index=False)
+            print(f"表{table_name}复制完成.")
+            
 # 每年5月1日上午2点更新一次indicator-roe-from-1991.sqlite3
 @scheduler.scheduled_job('cron', month=5, day=1, hour=2, minute=0)
 def update_indicator_roe_from_1991():

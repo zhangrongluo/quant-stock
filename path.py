@@ -33,8 +33,6 @@ SW_INDUSTRY_DF = pd.read_excel(SW_INDUSTRY_XLS, usecols=['股票代码', '公司
 # 数据库表名
 ROE_TABLE = "indicators"  # indicator-roe-from-1991.sqlite3中的表
 CURVE_TABLE = "curve"  # curve.sqlite3中的表
-now = time.localtime()
-CONDITION_TABLE = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}' # 每年5月建新表
 
 # iMac本地仓库路径
 IMAC_REPOSITORY_PATH = "/Users/zhangrongluo/Desktop/pythonzone/win-stock-conditions/win-stock-conditions"

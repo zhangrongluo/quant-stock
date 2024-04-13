@@ -2,7 +2,7 @@ import time
 import pandas as pd
 import sqlite3
 from strategy import Strategy
-from path import TEST_CONDITION_SQLITE3, CONDITION_TABLE
+from path import TEST_CONDITION_SQLITE3
 import threading
 
 lock = threading.Lock()
@@ -39,6 +39,8 @@ def auto_test():
     完成重新测试动作以后,本函数开始随机测试新生成的测试条件.
     无限循环流程,断线后自动重连.
     """
+    now = time.localtime()
+    table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
     con = sqlite3.connect(TEST_CONDITION_SQLITE3)
     with con:
         sql = """
@@ -49,29 +51,12 @@ def auto_test():
                 PRIMARY KEY(year)
             )
         """
-        con.execute(sql)
-        sql = f"""
-            CREATE TABLE IF NOT EXISTS '{CONDITION_TABLE}'
-            (
-                strategy TEXT, 
-                test_condition TEXT, 
-                total_groups INTEGER, 
-                valid_groups INTEGER, 
-                valid_percent REAL, 
-                valid_groups_keys TEXT, 
-                basic_ratio REAL, 
-                inner_rate REAL,
-                down_max REAL, 
-                score REAL, 
-                date TEXT,
-                PRIMARY KEY(strategy, test_condition)
-            )
-        """
-        con.execute(sql)
-    
+        con.execute(sql)    
     case = Strategy()
     while True:
+        # 动态获取年度表格名,必须要重新定义,否则会出现表格名不更新的情况
         now = time.localtime()
+        table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
         # 第一步 重新检测以前年度的全部测试条件
         con = sqlite3.connect(TEST_CONDITION_SQLITE3)
         with con:
@@ -82,8 +67,25 @@ def auto_test():
                 """
                 con.execute(sql)
             else:  # now.tm_mon in [5, 6, 7, 8, 9, 10, 11, 12]:
-                # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数,
-                # 并保存结果到CONDITION_TABLE表中.
+                sql = f"""
+                    CREATE TABLE IF NOT EXISTS '{table_name}'
+                    (
+                        strategy TEXT, 
+                        test_condition TEXT, 
+                        total_groups INTEGER, 
+                        valid_groups INTEGER, 
+                        valid_percent REAL, 
+                        valid_groups_keys TEXT, 
+                        basic_ratio REAL, 
+                        inner_rate REAL,
+                        down_max REAL, 
+                        score REAL, 
+                        date TEXT,
+                        PRIMARY KEY(strategy, test_condition)
+                    )
+                """
+                con.execute(sql)
+                # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数
                 if has_test_previous_year() is False:
                     # 获取以前年度表格的表名(不包含当年的表)
                     df = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table"', con)
@@ -96,7 +98,7 @@ def auto_test():
                             src_sqlite3=TEST_CONDITION_SQLITE3, 
                             src_table=prev_table, 
                             dest_sqlite3=TEST_CONDITION_SQLITE3, 
-                            dest_table=CONDITION_TABLE
+                            dest_table=table_name
                         )
                     # 更新当年的flag值为Yes
                     sql = f"""
@@ -108,7 +110,7 @@ def auto_test():
             try:
                 case.test_strategy_random_condition(
                     sqlite_file=TEST_CONDITION_SQLITE3, 
-                    table_name=CONDITION_TABLE
+                    table_name=table_name
                 )
                 time.sleep(10)
             except Exception as e:

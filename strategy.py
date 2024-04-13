@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Union
 import utils
-from path import INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, CONDITION_TABLE
+from path import INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3
 
 class Strategy:
     def __init__(self):
@@ -150,7 +150,7 @@ class Strategy:
         test_result = {date: [] for date in result.keys()}  # 定义返回值
 
         if sum([len(item) for item in result.values()])/len(result) > max_nembers:
-            print('测试结果股票数量过多,为减轻计算压力,返回定制的结果')
+            # print('测试结果股票数量过多,为减轻计算压力,返回定制的结果')
             return {date: [0, 0] for date in result.keys()}
         
         for date, stocks in sorted(result.items(), key=lambda x: x[0]):  # 对每个时间组的选股结果进行回测
@@ -240,8 +240,8 @@ class Strategy:
     def save_strategy_to_sqlite3(
         self, 
         evaluate_result: Dict,
+        table_name,
         sqlite_file: str = TEST_CONDITION_SQLITE3,
-        table_name: str = CONDITION_TABLE
         ) -> None:
         """
         如某个结果综合得分超过80分且valid_percent大于25%,则储存该组合的测试条件和相关评估信息到数据库.
@@ -249,8 +249,8 @@ class Strategy:
         valid_percent(有效时间组占比)、valid_groups_keys(有效时间组清单)、basci_ratio(对000300的胜率)
         和inner_rate(内在收益率)、down_max(最大回撤)、score(综合得分)、date(保存日期).
         :param evaluate_result: 测试结果和指数收益对比的评估结果的返回值. 
-        :param sqlite_file: 目标数据库文件路径,默认为TEST_CONDITION_SQLITE3.
         :param table_name: 目标数据库表名,默认为CONDITION_TABLE.
+        :param sqlite_file: 目标数据库文件路径,默认为TEST_CONDITION_SQLITE3.
         :return: None
         NOTE:
         综合得分低于90分或者valid_percent小于0.33,不保存返回.
@@ -390,16 +390,16 @@ class Strategy:
     def test_strategy_specific_condition(
         self, 
         condition: Dict, 
-        display: bool = False,
+        table_name,
         sqlite_file: str = TEST_CONDITION_SQLITE3,
-        table_name: str = CONDITION_TABLE
+        display: bool = False,
         ):
         """
         测试回测类的闭环效果,测试对象为特定的测试条件,测试结果将保存到数据库
         :param condition: 测试条件,字典类型,结构如下:{'strategy': 'ROE', 'test_condition': {...}}
-        :param display: 是否显示中间结果
-        :param sqlite_file: 保存测试结果的sqlite3数据库文件
         :param table_name: 保存测试结果的sqlite3数据库中的表名
+        :param sqlite_file: 保存测试结果的sqlite3数据库文件
+        :param display: 是否显示中间结果
         :return: None
         """
         strategy = condition['strategy']
@@ -432,17 +432,17 @@ class Strategy:
 
     def test_strategy_random_condition(
         self, 
+        table_name,
+        sqlite_file: str = TEST_CONDITION_SQLITE3,
         times: int = 10, 
         display: bool = False,
-        sqlite_file: str = TEST_CONDITION_SQLITE3,
-        table_name: str = CONDITION_TABLE
         ):
         """
         测试回测类的闭环效果,测试对象为随机生成的测试条件
+        :param table_name: 保存测试结果的sqlite3数据库中的表名
+        :param sqlite_file: 保存测试结果的sqlite3数据库文件
         :param times: 测试次数
         :param display: 是否显示中间结果
-        :param sqlite_file: 保存测试结果的sqlite3数据库文件
-        :param table_name: 保存测试结果的sqlite3数据库中的表名
         :return: None
         """
         start = time.time()
@@ -652,21 +652,21 @@ class Strategy:
 
     @staticmethod
     def select_portfolio_conditions_by_rate(
+        table_name,
+        sqlite_name = TEST_CONDITION_SQLITE3, 
         valid_percent = 0.33, 
         basic_ratio = 0.75, 
         inner_rate = 0.25,
         down_max = -0.30, 
-        sqlite_name = TEST_CONDITION_SQLITE3, 
-        table_name = CONDITION_TABLE
     ) -> Union[pd.DataFrame, None]:
         """
         通过指标值获取符合条件的测试条件集,构建投资组合.
+        :param table_name: sqlite3数据库表名
+        :param sqlite_name: sqlite3数据库文件名
         :param valid_percent: 最低有效时间组占比
         :param basic_ratio: 最低对000300的胜率
         :param inner_rate: 最低内在收益率
         :param down_max: 最大回撤
-        :param sqlite_name: sqlite3数据库文件名
-        :param table_name: sqlite3数据库表名
         :return: 符合条件的测试条件集
         """
         con = sqlite3.connect(sqlite_name)
@@ -698,21 +698,21 @@ class Strategy:
 
     def select_portfolio_conditions_by_percentile(
         self,
+        table_name,
+        sqlite_name=TEST_CONDITION_SQLITE3,
         valid_percentile=50,
         basic_ratio_percentile=50,
         inner_rate_percentile=50,
         down_max_percentile=50,
-        sqlite_name=TEST_CONDITION_SQLITE3,
-        table_name=CONDITION_TABLE
     ) -> Union[pd.DataFrame, None]:
         """
         通过指标百分位数获取符合条件的测试条件集,构建投资组合.
+        :param table_name: sqlite3数据库表名
+        :param sqlite_name: sqlite3数据库文件名
         :param valid_percentile: 最低有效时间组占比的百分位数
         :param basic_ratio_percentile: 最低对000300的胜率的百分位数
         :param inner_rate_percentile: 最低内在收益率的百分位数
         :param down_max_percentile: 最大回撤的百分位数
-        :param sqlite_name: sqlite3数据库文件名
-        :param table_name: sqlite3数据库表名
         :return: 符合条件的测试条件集
         NOTE:
         本函数通过调用self.select_portfolio_conditions_by_rate函数实现.
@@ -742,9 +742,7 @@ class Strategy:
 
     @staticmethod
     def comprehensive_sorting_test_condition_sqlite3(
-        sqlite_name=TEST_CONDITION_SQLITE3,
-        table_name=CONDITION_TABLE,
-        riskmode=0
+        table_name, sqlite_name, riskmode=0
     ) -> Union[pd.DataFrame, None]:
         """ 
         综合排序测试条件数据库,按照综合得分进行排序.排序方法如下:
@@ -753,8 +751,8 @@ class Strategy:
         对inner_rate进行降序排列,排第一位的行赋值为1,第二位赋值为2,以此类推
         对basic_ratio进行降序排列,排第一位的行赋值为1,第二位赋值为2,以此类推
         对上述三个字段的排名求和,得到一个新的字段,按照新字段进行升序排列(得分低者为优先选项).
-        :param sqlite_name: sqlite3数据库文件名
         :param table_name: sqlite3数据库表名
+        :param sqlite_name: sqlite3数据库文件名
         :param riskmode: 默认为0,风险优先模式,1为收益优先模式,2为均衡模式.
             在风险优先模式下,down_max的权重为2,inner_rate的权重为1.5, basic_ratio的权重为1
             在收益优先模式下,down_max的权重为1.5,inner_rate的权重为2, basic_ratio的权重为1
