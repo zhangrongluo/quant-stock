@@ -91,13 +91,18 @@ def copy_condition_table():
             df.to_sql(f'{table_name}-from-win', con_dest, if_exists='replace', index=False)
             print(f"表{table_name}复制完成.")
             
-# 每年5月1日上午2点更新一次indicator-roe-from-1991.sqlite3
-@scheduler.scheduled_job('cron', month=5, day=1, hour=2, minute=0)
+# 每年5月1日上午12点更新一次indicator-roe-from-1991.sqlite3
+@scheduler.scheduled_job('cron', month=5, day=1, hour=12, minute=0)
 def update_indicator_roe_from_1991():
     with semaphore:
         print('开始更新indicator-roe-from-1991.sqlite3\r', end='', flush=True)
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            executor.map(data.update_ROE_indicators_table_from_1991, codes)
+        while True:
+            try:
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    executor.map(data.update_ROE_indicators_table_from_1991, codes)
+                break
+            except Exception as e:
+                print(f"更新indicator-roe-from-1991.sqlite3出错,原因:{e}" + ' '*20, flush=True)
         print('更新indicator-roe-from-1991.sqlite3完成.' + ' '*20, flush=True)
 
 def run():

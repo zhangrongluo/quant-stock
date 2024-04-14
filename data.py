@@ -487,8 +487,13 @@ if __name__ == '__main__':
             print('curve表格更新成功.'+ ' '*20)
         elif msg.upper() == 'UPDATE-ROE-TABLE':
             print('正在更新indicators表格,请稍等...\r', end='', flush=True)
-            with ThreadPoolExecutor() as pool:
-                pool.map(update_ROE_indicators_table_from_1991, stocks)
+            while True:
+                try:
+                    with ThreadPoolExecutor() as pool:
+                        pool.map(update_ROE_indicators_table_from_1991, stocks)
+                    break
+                except Exception as e:
+                    print(f"更新indicators表格出错,原因:{e}." + ' '*20)
             print('indicators表格更新成功.'+ ' '*20)
         elif msg.upper() == 'CREATE-INDEX-VALUE':
             print('正在创建指数估值数据库,请稍等...\r', end='', flush=True)
