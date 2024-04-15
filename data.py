@@ -471,15 +471,8 @@ if __name__ == '__main__':
             print('indicators表格创建成功.'+ ' '*20)
         elif msg.upper() == 'UPDATE-TRADE-CSV':
             print('正在更新trade-record csv文件,请稍等...\r', end='', flush=True)
-            # for stock in stocks:
-            #     update_trade_record_csv(stock)
-            while True:
-                try:  # 线程池中断后重新更新直到全部更新完成
-                    with ThreadPoolExecutor() as pool:
-                        pool.map(update_trade_record_csv, stocks)
-                    break
-                except Exception as e:
-                    print(f"更新trade record文件出错,原因:{e}." + ' '*20)
+            for stock in stocks:
+                update_trade_record_csv(stock)
             print('trade-record csv文件更新成功.'+ ' '*20)
         elif msg.upper() == 'UPDATE-CURVE':
             print('正在更新curve表格,请稍等...\r', end='', flush=True)
@@ -487,13 +480,8 @@ if __name__ == '__main__':
             print('curve表格更新成功.'+ ' '*20)
         elif msg.upper() == 'UPDATE-ROE-TABLE':
             print('正在更新indicators表格,请稍等...\r', end='', flush=True)
-            while True:
-                try:
-                    with ThreadPoolExecutor() as pool:
-                        pool.map(update_ROE_indicators_table_from_1991, stocks)
-                    break
-                except Exception as e:
-                    print(f"更新indicators表格出错,原因:{e}." + ' '*20)
+            with ThreadPoolExecutor() as pool:
+                pool.map(update_ROE_indicators_table_from_1991, stocks)
             print('indicators表格更新成功.'+ ' '*20)
         elif msg.upper() == 'CREATE-INDEX-VALUE':
             print('正在创建指数估值数据库,请稍等...\r', end='', flush=True)
