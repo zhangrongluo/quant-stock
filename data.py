@@ -17,7 +17,7 @@ import pandas as pd
 import tushare as ts
 import swindustry as sw
 from path import (TRADE_RECORD_PATH, INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, ROE_TABLE, 
-                CURVE_TABLE, INDEX_VALUE)
+                CURVE_TABLE, INDEX_VALUE, TEST_CONDITION_SQLITE3, TEST_CONDITION_PATH)
 
 def get_IPO_date(code: str) -> str:
     """
@@ -446,7 +446,7 @@ if __name__ == '__main__':
         print('-------------------------操作提示-------------------------')
         print('Create-Trade-CSV      Create-Curve       Create-Roe-Table')
         print('Update-Trade-CSV      Update-Curve       Update-ROE-Table')
-        print('Create-Index-Value                       Quit            ')
+        print('Create-Index-Value    Sort-Conditions    Quit            ')
         print('---------------------------------------------------------')
         msg = input('>>>> 请选择操作提示 >>>>  ')
         if msg.upper()  == 'QUIT':
@@ -488,5 +488,24 @@ if __name__ == '__main__':
             for index in ["000300", "000905", "399006"]:
                 create_index_indicator_table(index)
             print('指数估值数据库创建成功.'+ ' '*20)
+        elif msg.upper() == 'SORT-CONDITIONS':
+            print('正在排序条件表格,请稍等...\r', end='', flush=True)
+            if not os.path.exists(TEST_CONDITION_SQLITE3):
+                print(f"{TEST_CONDITION_SQLITE3}文件不存在,请检查.")
+                continue
+            from strategy import Strategy
+            stra = Strategy()
+            now = time.localtime()
+            table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
+            for mode in [0, 1, 2]:
+                df = stra.comprehensive_sorting_test_condition_sqlite3(
+                    table_name=table_name, riskmode=mode,
+                    sqlite_name=TEST_CONDITION_SQLITE3
+                )
+                file_name = os.path.join(
+                    TEST_CONDITION_PATH, f"conditions-by-mode{mode}.xlsx"
+                )
+                df.to_excel(file_name, index=False)
+            print('条件表格排序成功.'+ ' '*20)
         else:
             continue
