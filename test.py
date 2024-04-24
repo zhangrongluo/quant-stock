@@ -104,22 +104,23 @@ def auto_test():
                     # 获取table_name表格中的测试条件,遍历prev_table_names,对相同的测试条件,
                     # 则将table_name表格中的date字段替换为prev_table表格中的date字段
                     # 保留全部入选测试条件原始日期
-                    restested_conditions = case.get_conditions_from_sqlite3(
+                    retested_conditions = case.get_conditions_from_sqlite3(
                         src_sqlite3=TEST_CONDITION_SQLITE3, src_table=table_name
                     )
-                    for condition in restested_conditions:
+                    for condition in retested_conditions:
                         for prev_table in prev_table_names:
                             sql = f""" 
-                                SELECT date FROM '{prev_table}' WHERE strategy='{condition["strategy"]}'
-                                AND test_condition='{json.dumps(condition["test_condition"])}'
+                                SELECT date FROM '{prev_table}' WHERE strategy=? AND test_condition=?
                             """
-                            date = con.execute(sql).fetchone()
+                            params = (condition["strategy"], json.dumps(condition["test_condition"]))
+                            date = con.execute(sql, params).fetchone()
                             if date is not None:
                                 sql = f"""
-                                    UPDATE '{table_name}' SET date='{date[0]}' WHERE strategy='{condition["strategy"]}' 
-                                    AND test_condition='{json.dumps(condition["test_condition"])}'
+                                    UPDATE '{table_name}' SET date='{date[0]}' WHERE strategy=?
+                                    AND test_condition=?
                                 """
-                                con.execute(sql)
+                                params = (condition["strategy"], json.dumps(condition["test_condition"]))
+                                con.execute(sql, params)
                                 break
                     # 更新当年的flag值为Yes
                     sql = f"""
