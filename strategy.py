@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Union
 import utils
+import tsswindustry as sw
 from path import INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3
 
 class Strategy:
@@ -558,6 +559,8 @@ class Strategy:
             columns = df.columns
             del df
 
+            sw_stocks = sw.get_all_stocks()
+            sw_codes = [item[0] for item in sw_stocks]  # 申万行业分类股票代码集合
             for index, item in enumerate(columns):
                 if index >= 3 and index+period <= len(columns):  # 动态构建查询范围
                     year_list = columns[index: index+period]
@@ -575,6 +578,8 @@ class Strategy:
                         else:
                             sql += f"""{year}>=? and """
                     res = con.execute(sql, tuple(roe_list)).fetchall()
+                    # 检查res股票清单是否在申万行业分类取票sw_codes中
+                    res = [item for item in res if item[0] in sw_codes]
                     result[f"""{columns[index]}-{columns[index+period-1]}"""] = res
         return result
 

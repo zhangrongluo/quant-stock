@@ -27,6 +27,24 @@ scheduler = BackgroundScheduler()
 thread = threading.Thread(target=auto_test)
 codes = [item[0][0:6] for item in sw.get_all_stocks()]
 
+# 每日上午6点开始检查文件和数据完整性
+@scheduler.scheduled_job('cron', hour=6, minute=0)
+def check_integrity():
+    with semaphore:
+        res = data.check_stockcodes_integrity()
+        if res["roe_table"]:
+            print("indicator_roe_from_1991.sqlite3文件中缺失的股票代码:")
+            print(res["roe_table"])
+            print("开始补齐缺失的数据...")
+            with ThreadPoolExecutor() as pool:
+                pool.map(data.create_ROE_indicators_table_from_1991, res["roe_table"])
+        if res["trade_record_path"]:
+            print('TRADE_RECORD_PATH目录中缺失的股票代码:')
+            print(res["trade_record_path"])
+            print("开始补齐缺失的数据...")
+            with ThreadPoolExecutor() as pool:
+                pool.map(data.create_trade_record_csv_table, res["trade_record_path"])
+
 # 每日下午6点30分开始更新一次trade record csv文件
 @scheduler.scheduled_job('cron', hour=18, minute=30)
 def update_trade_record_csv():
@@ -53,7 +71,7 @@ def update_index_value_sqlite3():
             data.create_index_indicator_table(index)
         print('更新index_value.sqlite3完成.' + ' '*20, flush=True)
 
-# 每周五上午7点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
+# 每周五下午6点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
 # 本地仓库路径: /Users/zhangrongluo/Desktop/pythonzone/win-stock-conditions/win-stock-conditions
 # 每周五上午8点推送到github
 @scheduler.scheduled_job('cron',  hour=18, minute=30)
@@ -65,8 +83,7 @@ def copy_test_condition_sqlite3():
             print('拷贝TEST_CONDITION_SQLITE3完成.' + ' '*20, flush=True)
 
 # 每年4月20日下午6点0分开始,将src中table_name表中的数据复制到
-# dest中的table_name+“from-win"表中,如果dest中已经存在table_name+“from-win"表,
-# 则覆盖原有表,如果dest中不存在table_name+“from-win"表,则新建表.
+# dest中的table_name+“from-win"表中.
 src = "/Users/zhangrongluo/Desktop/win-stock/tmp-file/test-condition.sqlite3"
 dest = "/Users/zhangrongluo/Desktop/quant-stock/test-condition/test-condition.sqlite3"
 @scheduler.scheduled_job('cron', month=4, day=20, hour=18, minute=0)
