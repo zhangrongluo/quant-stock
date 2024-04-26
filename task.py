@@ -15,7 +15,7 @@ import pandas as pd
 import datetime
 from concurrent.futures import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
-import swindustry as sw
+import tsswindustry as sw
 import data
 from test import auto_test
 from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH

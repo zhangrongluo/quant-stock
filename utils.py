@@ -8,7 +8,7 @@ import random
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict, Union
 import tushare as ts
-import swindustry as sw
+import tsswindustry as sw
 from path import (INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, CURVE_TABLE, 
                 ROE_TABLE, TRADE_RECORD_PATH, INDEX_VALUE)
 

@@ -15,7 +15,7 @@ from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import tushare as ts
-import swindustry as sw
+import tsswindustry as sw
 from path import (TRADE_RECORD_PATH, INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, ROE_TABLE, 
                 CURVE_TABLE, INDEX_VALUE, TEST_CONDITION_SQLITE3, TEST_CONDITION_PATH)
 
