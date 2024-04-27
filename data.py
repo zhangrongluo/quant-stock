@@ -131,18 +131,18 @@ def check_stockcodes_integrity(
     trade_record_path = TRADE_RECORD_PATH,
     roe_sqlite = INDICATOR_ROE_FROM_1991,
     roe_table = ROE_TABLE
-):
+) -> Dict:
     """
     检查股票代码的完整性,以当前申万行业分类下全部股票为基准, 检查TRADE_RECORD_PATH目录下
     的文件是否完整, 检查ROE_TABLE数据表中的股票代码是否完整.
     :param trade_record_path: str, TRADE_RECORD_PATH目录
     :param roe_sqlite: str, INDICATOR_ROE_FROM_1991文件
     :param roe_table: str, ROE_TABLE表名
-    :return: dict
+    :return: Dict,返回缺失的股票和文件代码信息
     NOTE:
     返回一个字典,包含二个键值对:
-    1. trade_record_path: [], 表示trade-record-path目录下缺失的股票代码,
-    2. roe_table: [], 表示roe_table数据表中缺失的股票代码.
+    1. trade_record_path: [...], 表示trade-record-path目录下缺失的股票代码,
+    2. roe_table: [...], 表示roe_table数据表中缺失的股票代码.
     """
     result = {}  # 返回结果
     sw_stocks = sw.get_all_stocks()
@@ -538,9 +538,7 @@ if __name__ == '__main__':
                     table_name=table_name, riskmode=mode,
                     sqlite_name=TEST_CONDITION_SQLITE3
                 )
-                file_name = os.path.join(
-                    TEST_CONDITION_PATH, f"conditions-by-mode{mode}.xlsx"
-                )
+                file_name = os.path.join(TEST_CONDITION_PATH, f"conditions-by-mode{mode}.xlsx")
                 df.to_excel(file_name, index=False)
             print('条件表格排序成功.'+ ' '*20)
         elif msg.upper() == 'CHECK-INTEGRITY':
@@ -553,13 +551,13 @@ if __name__ == '__main__':
                 print("开始补齐缺失的数据...")
                 with ThreadPoolExecutor() as pool:
                     pool.map(create_ROE_indicators_table_from_1991, res["roe_table"])
-                # print("indicator_roe_from_1991.sqlite3文件中缺失的数据已补齐.")
+                print("indicator_roe_from_1991.sqlite3文件中缺失的数据已补齐."+" "*50)
             if res["trade_record_path"]:
-                print('TRADE_RECORD_PATH目录中缺失的股票代码:')
+                print("TRADE_RECORD_PATH目录中缺失的股票交易信息代码:")
                 print(res["trade_record_path"])
-                print("开始补齐缺失的数据...")
+                print("开始补齐缺失的交易信息文件...")
                 with ThreadPoolExecutor() as pool:
                     pool.map(create_trade_record_csv_table, res["trade_record_path"])
-                # print("TRADE_RECORD_PATH目录中缺失的文件已补齐.")
+                print("TRADE_RECORD_PATH目录中缺失的交易信息文件已补齐."+" "*50)
         else:
             continue

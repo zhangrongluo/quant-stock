@@ -38,12 +38,14 @@ def check_integrity():
             print("开始补齐缺失的数据...")
             with ThreadPoolExecutor() as pool:
                 pool.map(data.create_ROE_indicators_table_from_1991, res["roe_table"])
+            print("indicator_roe_from_1991.sqlite3文件中缺失的数据已补齐."+" "*50)
         if res["trade_record_path"]:
             print('TRADE_RECORD_PATH目录中缺失的股票代码:')
             print(res["trade_record_path"])
-            print("开始补齐缺失的数据...")
+            print("开始补齐缺失的交易记录文件...")
             with ThreadPoolExecutor() as pool:
                 pool.map(data.create_trade_record_csv_table, res["trade_record_path"])
+            print("TRADE_RECORD_PATH目录中缺失的交易信息文件已补齐."+" "*50)
 
 # 每日下午6点30分开始更新一次trade record csv文件
 @scheduler.scheduled_job('cron', hour=18, minute=30)
