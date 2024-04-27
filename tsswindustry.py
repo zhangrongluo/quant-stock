@@ -66,7 +66,7 @@ def get_stock_classes() -> List:
     获取申万行业分类清单
     :return: 申万行业分类清单
     """
-    result = _get_stock_classes()
+    result = df['index_name'].unique().tolist()
     return result
 
 def get_name_and_class_by_code(code: str) -> List:
