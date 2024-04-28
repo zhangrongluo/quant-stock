@@ -134,31 +134,39 @@ def check_stockcodes_integrity(
 ) -> Dict:
     """
     检查股票代码的完整性,以当前申万行业分类下全部股票为基准, 检查TRADE_RECORD_PATH目录下
-    的文件是否完整, 检查ROE_TABLE数据表中的股票代码是否完整.
+    每个行业目录下股票的交易记录文件是否完整, 检查ROE_TABLE数据表中的股票代码是否完整.
     :param trade_record_path: str, TRADE_RECORD_PATH目录
     :param roe_sqlite: str, INDICATOR_ROE_FROM_1991文件
     :param roe_table: str, ROE_TABLE表名
     :return: Dict,返回缺失的股票和文件代码信息
     NOTE:
     返回一个字典,包含二个键值对:
-    1. trade_record_path: [...], 表示trade-record-path目录下缺失的股票代码,
+    1. trade_record_path: {"农林牧渔":[...],...}, 表示每个行业目录下缺失的股票代码,
     2. roe_table: [...], 表示roe_table数据表中缺失的股票代码.
     """
     result = {}  # 返回结果
+    result['trade_record_path'] = {}
+    sw_classes = sw.get_stock_classes()
+    # 遍历sw_classes,获取每个行业目录下的全部股票代码
+    # 获取trade_record_path对应行业目录下的全部文件名称(以股票代码.csv命名)
+    # 比较两者的差异,储存缺失的股票代码
+    for stock_class in sw_classes:
+        dest_dir = os.path.join(trade_record_path, stock_class)
+        trade_files = os.listdir(dest_dir)
+        trade_codes = [f.split('.')[0] for f in trade_files if f.endswith(".csv")]
+        dest_stocks = sw.get_stocks_of_specific_class(stock_class=stock_class)
+        dest_codes = [item[0][0:6] for item in dest_stocks]
+        diff_codes = [code for code in dest_codes if code not in trade_codes]
+        if diff_codes:
+            result['trade_record_path'][stock_class] = diff_codes
     sw_stocks = sw.get_all_stocks()
     sw_codes = [item[0][0:6] for item in sw_stocks]  # 不含后缀的全部股票代码
-    trade_files = []  # 获取trade_record_path目录下的全部文件名称(以股票代码.csv命名)
-    for root, dirs, files in os.walk(trade_record_path):
-        tmp = [f for f in files if f.endswith('.csv')]
-        trade_files.extend(tmp)
-    trade_codes = [f.split('.')[0] for f in trade_files]  # 不含后缀的全部股票代码
     con = sqlite3.connect(roe_sqlite)  # 获取roe_table数据表中的全部股票代码
     with con:
         sql = f""" SELECT stockcode FROM "{roe_table}" """
         df = pd.read_sql(sql, con)
         roe_codes = df['stockcode'].values.tolist()
         roe_codes = [code[0:6] for code in roe_codes]  # 不含后缀的全部股票代码
-    result['trade_record_path'] = [code for code in sw_codes if code not in trade_codes]
     result['roe_table'] = [code for code in sw_codes if code not in roe_codes]
     return result
 
@@ -556,8 +564,10 @@ if __name__ == '__main__':
                 print("TRADE_RECORD_PATH目录中缺失的股票交易信息代码:")
                 print(res["trade_record_path"])
                 print("开始补齐缺失的交易信息文件...")
-                with ThreadPoolExecutor() as pool:
-                    pool.map(create_trade_record_csv_table, res["trade_record_path"])
+                diff_codes = res["trade_record_path"].values()
+                for codes in diff_codes:
+                    with ThreadPoolExecutor() as pool:
+                        pool.map(create_trade_record_csv_table, codes)
                 print("TRADE_RECORD_PATH目录中缺失的交易信息文件已补齐."+" "*50)
         else:
             continue
