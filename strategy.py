@@ -580,6 +580,9 @@ class Strategy:
                     res = con.execute(sql, tuple(roe_list)).fetchall()
                     # 检查res股票清单是否在申万行业分类取票sw_codes中
                     res = [item for item in res if item[0] in sw_codes]
+                    # 检查res股票清单是否在sw行业指数中
+                    trade_date = str(int(columns[index][1:5])+1)+'-06-01'
+                    res = [item for item in res if sw.in_index_or_not(item[0][:6], trade_date)]
                     result[f"""{columns[index]}-{columns[index+period-1]}"""] = res
         return result
 

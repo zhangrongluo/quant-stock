@@ -544,7 +544,7 @@ if __name__ == '__main__':
         elif msg.upper() == 'CHECK-INTEGRITY':
             res = check_stockcodes_integrity()
             if not res["roe_table"] and not res["trade_record_path"]:
-                print("股票代码完整性检查通过.")
+                print("股票代码完整性检查通过,共有股票代码:", len(stocks))
             if res["roe_table"]:
                 print("indicator_roe_from_1991.sqlite3文件中缺失的股票代码:")
                 print(res["roe_table"])
