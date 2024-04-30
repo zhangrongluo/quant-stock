@@ -86,11 +86,11 @@ def copy_test_condition_sqlite3():
             shutil.copyfile(TEST_CONDITION_SQLITE3, os.path.join(IMAC_REPOSITORY_PATH, "test-condition-quant.sqlite3"))
             print('拷贝TEST_CONDITION_SQLITE3完成.' + ' '*20, flush=True)
 
-# 每年4月20日下午6点0分开始,将src中table_name表中的数据复制到
+# 每月25日下午6点0分开始,将src中table_name表中的数据复制到
 # dest中的table_name+“from-win"表中.
 src = "/Users/zhangrongluo/Desktop/win-stock/tmp-file/test-condition.sqlite3"
 dest = "/Users/zhangrongluo/Desktop/quant-stock/test-condition/test-condition.sqlite3"
-@scheduler.scheduled_job('cron', month=4, day=20, hour=18, minute=0)
+@scheduler.scheduled_job('cron', day=25, hour=18, minute=0)
 def copy_condition_table():
     with semaphore:
         print('开始复制test-condition.sqlite3\r', end='', flush=True)
@@ -106,8 +106,8 @@ def copy_condition_table():
             df.to_sql(f'{table_name}-from-win', con_dest, if_exists='replace', index=False)
             print(f"表{table_name}复制完成.")
             
-# 每年4月30日下午8点更新一次indicator-roe-from-1991.sqlite3
-@scheduler.scheduled_job('cron', month=4, day=30, hour=20, minute=0)
+# 每年5月1日上午0点15更新一次indicator-roe-from-1991.sqlite3
+@scheduler.scheduled_job('cron', month=5, day=1, hour=0, minute=15)
 def update_indicator_roe_from_1991():
     with semaphore:
         print('开始更新indicator-roe-from-1991.sqlite3\r', end='', flush=True)

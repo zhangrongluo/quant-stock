@@ -245,7 +245,7 @@ class Strategy:
         sqlite_file: str = TEST_CONDITION_SQLITE3,
         ) -> None:
         """
-        如某个结果综合得分超过80分且valid_percent大于25%,则储存该组合的测试条件和相关评估信息到数据库.
+        如某个结果综合得分超过85分且valid_percent大于35%,则储存该组合的测试条件和相关评估信息到数据库.
         数据库内容:strategy、test_condition、total_groups(总时间组数目)、valid_groups(有效时间组数目)、
         valid_percent(有效时间组占比)、valid_groups_keys(有效时间组清单)、basci_ratio(对000300的胜率)
         和inner_rate(内在收益率)、down_max(最大回撤)、score(综合得分)、date(保存日期).
@@ -254,9 +254,9 @@ class Strategy:
         :param sqlite_file: 目标数据库文件路径,默认为TEST_CONDITION_SQLITE3.
         :return: None
         NOTE:
-        综合得分低于90分或者valid_percent小于0.33,不保存返回.
+        综合得分低于85分或者valid_percent小于0.35,不保存返回.
         """
-        if evaluate_result['score'] < 90 or evaluate_result['valid_percent'] < 0.33:
+        if evaluate_result['score'] < 85 or evaluate_result['valid_percent'] < 0.35:
             return
         conn = sqlite3.connect(sqlite_file)
         with conn:
