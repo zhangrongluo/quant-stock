@@ -106,8 +106,8 @@ def copy_condition_table():
             df.to_sql(f'{table_name}-from-win', con_dest, if_exists='replace', index=False)
             print(f"表{table_name}复制完成.")
             
-# 每年5月1日上午0点15更新一次indicator-roe-from-1991.sqlite3
-@scheduler.scheduled_job('cron', month=5, day=1, hour=0, minute=15)
+# 每年5月1日上午0点0分1秒更新indicator-roe-from-1991.sqlite3
+@scheduler.scheduled_job('cron', month=5, day=1, hour=0, minute=0, second=1)
 def update_indicator_roe_from_1991():
     with semaphore:
         print('开始更新indicator-roe-from-1991.sqlite3\r', end='', flush=True)

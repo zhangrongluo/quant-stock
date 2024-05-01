@@ -394,6 +394,7 @@ class Strategy:
         table_name,
         sqlite_file: str = TEST_CONDITION_SQLITE3,
         display: bool = False,
+        restest_or_not: bool = False,
         ):
         """
         测试回测类的闭环效果,测试对象为特定的测试条件,测试结果将保存到数据库
@@ -401,6 +402,7 @@ class Strategy:
         :param table_name: 保存测试结果的sqlite3数据库中的表名
         :param sqlite_file: 保存测试结果的sqlite3数据库文件
         :param display: 是否显示中间结果
+        :param restest_or_not: 是否重新测试
         :return: None
         """
         strategy = condition['strategy']
@@ -412,6 +414,10 @@ class Strategy:
             result = self.ROE_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
         elif strategy == 'ROE-MOS-DIVIDEND':
             result = self.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
+        # 如果是重新测试以前年度的全部测试条件,则删除一个时间组的测试结果，
+        # 因为投资组合和指数的收益均为0，没有意义
+        if restest_or_not:
+            result.pop(list(result.keys())[0])
         if display:
             print('+'*120)
             print(result)
@@ -447,6 +453,7 @@ class Strategy:
         sqlite_file: str = TEST_CONDITION_SQLITE3,
         times: int = 10, 
         display: bool = False,
+        restest_or_not: bool = False,
         ):
         """
         测试回测类的闭环效果,测试对象为随机生成的测试条件
@@ -454,6 +461,7 @@ class Strategy:
         :param sqlite_file: 保存测试结果的sqlite3数据库文件
         :param times: 测试次数
         :param display: 是否显示中间结果
+        :param restest_or_not: 是否重新测试
         :return: None
         """
         start = time.time()
@@ -472,7 +480,8 @@ class Strategy:
                 print(f'测试条件：{condition}'.ljust(120, ' '))
                 self.test_strategy_specific_condition(
                     condition=condition, display=display, 
-                    sqlite_file=sqlite_file, table_name=table_name
+                    sqlite_file=sqlite_file, table_name=table_name, 
+                    restest_or_not=restest_or_not
                 )
         end = time.time()
         print('+'*120)
@@ -525,10 +534,11 @@ class Strategy:
                 src_sqlite3=dest_sqlite3, src_table=dest_table
             )
             if condition not in tmp_conditons:
-                print(f'测试条件：{condition}'.ljust(120, ' '))
+                print(f'正在重新测试条件：{condition}'.ljust(120, ' '))
                 self.test_strategy_specific_condition(
                     condition=condition, display=False, 
-                    sqlite_file=dest_sqlite3, table_name=dest_table
+                    sqlite_file=dest_sqlite3, table_name=dest_table,
+                    restest_or_not=True
                 )
     
     @staticmethod

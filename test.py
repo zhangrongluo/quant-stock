@@ -39,6 +39,9 @@ def auto_test():
     每年5月份建立年度表格CONDITION_TABLE,并重新测试以前年度的全部测试条件,
     完成重新测试动作以后,本函数开始随机测试新生成的测试条件.
     无限循环流程,断线后自动重连.
+    NOTE:
+    在建立年度表格CONDITION_TABLE前,最好暂停该函数.等年度ROE表、交易记录文件
+    国债收益率文件以及其他相关文件都更新以后,再启动该函数.
     """
     now = time.localtime()
     table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'

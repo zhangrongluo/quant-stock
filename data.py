@@ -524,8 +524,16 @@ if __name__ == '__main__':
             print('curve表格更新成功.'+ ' '*20)
         elif msg.upper() == 'UPDATE-ROE-TABLE':
             print('正在更新indicators表格,请稍等...\r', end='', flush=True)
+            con = sqlite3.connect(INDICATOR_ROE_FROM_1991)
+            with con:
+                sql = f""" SELECT * FROM '{ROE_TABLE}' """
+                df = pd.read_sql_query(sql, con)
+                df = df[df.columns[:4]]  # 只取前四列
+                df = df[df.iloc[:, 3].isnull()]  # 取出最新年度ROE字段为空的股票代码
+                null_stocks = df['stockcode'].values.tolist()
+                null_stocks = [code[0:6] for code in null_stocks]
             with ThreadPoolExecutor() as pool:
-                pool.map(update_ROE_indicators_table_from_1991, stocks)
+                pool.map(update_ROE_indicators_table_from_1991, null_stocks)
             print('indicators表格更新成功.'+ ' '*20)
         elif msg.upper() == 'CREATE-INDEX-VALUE':
             print('正在创建指数估值数据库,请稍等...\r', end='', flush=True)
