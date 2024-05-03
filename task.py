@@ -76,16 +76,20 @@ def update_index_value_sqlite3():
         print('更新index_value.sqlite3完成.' + ' '*20, flush=True)
 
 # 每周五下午6点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
-# 本地仓库路径: /Users/zhangrongluo/Desktop/pythonzone/win-stock-conditions/win-stock-conditions
-# 每周五上午8点推送到github
+# 然后推送到gitee main分支. 本地仓库路径IMAC_REPOSITORY_PATH
 @scheduler.scheduled_job('cron',  hour=18, minute=30)
 def copy_test_condition_sqlite3():
+    from path import ROOT_PATH
     with semaphore:
         if "iMac" in platform.uname().node:  # 如果是在imac机器上
-            print('开始拷贝TEST_CONDITION_SQLITE3\r', end='', flush=True)
             shutil.copyfile(TEST_CONDITION_SQLITE3, os.path.join(IMAC_REPOSITORY_PATH, "test-condition-quant.sqlite3"))
-            print('拷贝TEST_CONDITION_SQLITE3完成.' + ' '*20, flush=True)
-
+            print('拷贝TEST_CONDITION_SQLITE3完成.')
+            os.chdir(IMAC_REPOSITORY_PATH)
+            os.system("git add .")
+            os.system("git commit -m 'auto commit'")
+            os.system("git push gitee main")
+            os.chdir(ROOT_PATH)
+            print('推送到gitee main分支完成.' + ' '*20, flush=True)
 # 每月25日下午6点0分开始,将src中table_name表中的数据复制到
 # dest中的table_name+“from-win"表中.
 src = "/Users/zhangrongluo/Desktop/win-stock/tmp-file/test-condition.sqlite3"
