@@ -90,6 +90,7 @@ def copy_test_condition_sqlite3():
             os.system("git push gitee main")
             os.chdir(ROOT_PATH)
             print('推送到gitee main分支完成.' + ' '*20, flush=True)
+
 # 每月25日下午6点0分开始,将src中table_name表中的数据复制到
 # dest中的table_name+“from-win"表中.
 src = "/Users/zhangrongluo/Desktop/win-stock/tmp-file/test-condition.sqlite3"

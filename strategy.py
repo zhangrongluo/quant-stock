@@ -18,7 +18,7 @@ class Strategy:
     def generate_ROE_test_conditions(strategy: str, items: int = 10, mos_step: float = 0.25) -> List[Dict]:
         """
         生成测试条件列表,用于测试策略
-        :param strategy: 策略名称, 例如: 'roe', 'roe-dividend', 'roe-mos', 'roe-mos-dividend'
+        :param strategy: 策略名称, 例如: 'roe', 'roe-dividend', 'roe-mos', 'roe-mos-dividend', 'roe-mos-multi-yield'
         :param items: 生成的测试条件数量, 例如: 10
         :param mos_step: 生成的测试条件中MOS_RANGE的最大步长
         :return: 测试条件列表
@@ -28,8 +28,8 @@ class Strategy:
         mos_range取值范围为[-1, 1], 超过win-stock系统预设值[0.2, 1],但是step限制为不大于0.25
         dividend取值范围为[0, 10], 和win-stock系统预设值[0, 10]相同
         """
-        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND']:
-            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS, ROE-MOS-DIVIDEND)')
+        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']:
+            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS, ROE-MOS-DIVIDEND, ROE-MOS-MULTI-YIELD)')
 
         condition = []  # 定义返回值
         if strategy.upper() == 'ROE':
@@ -92,13 +92,34 @@ class Strategy:
                     }
                 }
                 condition.append(tmp)
+        elif strategy.upper() == "ROE-MOS-MULTI-YIELD":
+            # 该策略和ROE-MOS-DIVIDEND策略类似,只是用每个交易日10年国债利率的倍数替代固定股息率.
+            for item in range(items):
+                roe_value = random.randint(10, 40)
+                mos_range = [round(random.uniform(-1, 1), 4) for _ in range(2)]
+                mos_range.sort()
+                if mos_range[1] - mos_range[0] > mos_step:
+                    mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
+                multi_list = np.arange(0, 5, 0.1)  # 倍数列表
+                multi_value = round(np.random.choice(multi_list, 1)[0], 2)
+                tmp = {
+                    'strategy': strategy.upper(),
+                    'test_condition': {
+                        'roe_list': [roe_value]*7,
+                        'mos_range': mos_range,
+                        'multi_value': multi_value
+                    }
+                }
+                condition.append(tmp)
+        else:
+            ...
         return condition
 
     def display_result_of_strategy(self, strategy: Dict):
         """
         显示选股策略的具体结果.策略使用self.get_conditions_from_sqlite3获取.
         结构如下:{'strategy': '...', 'test_condition': {...}}
-        :param strategy: roe、roe-dividend、roe-mos、roe-mos-dividend策略.
+        :param strategy: roe、roe-dividend、roe-mos、roe-mos-dividend、roe-mos-multi-yield.
         """
         name = strategy['strategy']
         condition = strategy['test_condition']
@@ -112,6 +133,8 @@ class Strategy:
             res = self.ROE_DIVIDEND_strategy_backtest_from_1991(**condition)
         elif name.upper() == 'ROE-MOS-DIVIDEND':
             res = self.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(**condition)
+        elif name.upper() == 'ROE-MOS-MULTI-YIELD':
+            res = self.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(**condition)
         for key, value in sorted(res.items(), key=lambda x: x[0]):
             print(key, '投资组合', f'共{len(value)}', '只股票')
             stock_codes = []
@@ -144,8 +167,8 @@ class Strategy:
         quant-stock系统速度慢,相比win-stock而言,主打测试较小的组合.
         如果result参数时间组平均持股数量大于15,直接返回定制的测试结果
         """
-        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND']:
-            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS, ROE-MOS-DIVIDEND)')
+        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']:
+            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS, ROE-MOS-DIVIDEND, ROE-MOS-MULTI-YIELD)')
         if not all([item in ['000300', '399006', '000905'] for item in index_list]):
             raise ValueError('请检查指数代码是否正确')
         test_result = {date: [] for date in result.keys()}  # 定义返回值
@@ -156,7 +179,7 @@ class Strategy:
         
         for date, stocks in sorted(result.items(), key=lambda x: x[0]):  # 对每个时间组的选股结果进行回测
             code_list = [item[0][0:6] for item in stocks]  # 不含后缀
-            if strategy.upper() in ['ROE', 'ROE-PE-PB', 'ROE-MOS', 'ROE-DIVIDEND', 'ROE-MOS-DIVIDEND']:  # roe type strategy
+            if strategy.upper() in ['ROE', 'ROE-MOS', 'ROE-DIVIDEND', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']:  # roe type strategy
                 start_date = str(int(date[1:5])+1)+'-06-01'
                 end_date = str(int(date[1:5])+2)+'-06-01'
             else:
@@ -412,6 +435,8 @@ class Strategy:
             result = self.ROE_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
         elif strategy == 'ROE-MOS-DIVIDEND':
             result = self.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
+        elif strategy == 'ROE-MOS-MULTI-YIELD':
+            result = self.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(**condition['test_condition'])
         # 如果当前月份是5月,则删除第一个时间组的数据，
         # 因为改时间组投资组合和指数的收益均为0，没有意义
         if time.localtime().tm_mon == 5:
@@ -466,7 +491,7 @@ class Strategy:
         number = 0
         for i in range(times):
             print(f'第{i+1}轮测试......'.ljust(120, ' '))
-            strategy = random.choice(['ROE-MOS', 'ROE-DIVIDEND', 'ROE', 'ROE-MOS-DIVIDEND'])
+            strategy = random.choice(['ROE-MOS', 'ROE-DIVIDEND', 'ROE', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD'])
             items = random.randint(1, 5)
             mos_step = random.uniform(0.1, 0.30)
             number += items
@@ -684,6 +709,37 @@ class Strategy:
             result[date] = tmp_stocks
         return result
 
+    def ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(
+        self,
+        roe_list: List,
+        mos_range: List,
+        multi_value: float,
+    ) -> Dict:
+        """
+        本策略和ROE_MOS_DIVIDEND类似,只是用每个交易日10年国债利率的倍数替代固定股息率.
+        :param roe_list: 含义和使用方法和ROE_only_strategy_backtest_from_1991方法相同.
+        :param mos_range: 含义和使用方法和ROE_MOS_strategy_backtest_from_1991方法相同.
+        :param multi_value: 当期10年国债利率的倍数.
+        :return: 返回值为字典,含义和ROE_only_strategy_backtest_from_1991方法相同.
+        """
+        if len(roe_list) != 7:
+            raise Exception('roe_list参数年份数应为7年')
+
+        result = {}  # 定义返回值
+        tmp_result = self.ROE_MOS_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range)
+        for date, stocks in tmp_result.items():  # 股息率筛选
+            trade_date = f"{int(date[1:5])+1}"+'-06-01'
+            row = utils.find_closest_row_in_curve_table(trade_date)
+            yield_10 = row["value1"].values[0]
+            multi_yield = yield_10 * multi_value  # 当期10年国债利率的倍数
+            tmp_stocks = []
+            for stock in stocks:
+                tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], trade_date, 'dv_ttm')
+                if tmp_dividend >= multi_yield:
+                    tmp_stocks.append(stock)
+            result[date] = tmp_stocks
+        return result
+    
     @staticmethod
     def select_portfolio_conditions_by_rate(
         table_name,
@@ -721,7 +777,7 @@ class Strategy:
                 # 添加roe辅助列以便排序分组
                 if row['strategy'] == "ROE":
                     df.loc[index, 'roe'] = condition['roe_value']*condition['period']
-                elif row['strategy'] in ["ROE-MOS", "ROE-DIVIDEND", "ROE-MOS-DIVIDEND"]:
+                elif row['strategy'] in ["ROE-MOS", "ROE-DIVIDEND", "ROE-MOS-DIVIDEND", "ROE-MOS-MULTI-YIELD"]:
                     df.loc[index, 'roe'] = condition['roe_list'][0]
                 else:
                     ...
@@ -822,9 +878,9 @@ class Strategy:
 if __name__ == "__main__":
     stockbacktest = Strategy()
     while True:
-        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-        print('+++++++ ROE ROE-DIVIDEND ROE-MOS ROE-MOS-DIVIDEND QUIT ++++++++')
-        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+        print('+++++++ ROE ROE-DIVIDEND ROE-MOS ROE-MOS-DIVIDEND ROE-MOS-MULTI-YIELD QUIT ++++++++')
+        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
         msg = input('>>>> 请选择操作提示 <<<< ')
         if msg.upper() == 'ROE':
             while True:
@@ -944,6 +1000,50 @@ if __name__ == "__main__":
             print('正在执行ROE-MOS-DIVIDEND选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range, dividend=dividend)
+        elif msg.upper() == 'ROE-MOS-MULTI-YIELD':
+            while True:
+                try:
+                    roe_value = float(input('>>>> 请输入roe筛选值(数字型, 999999重新选择策略) <<<< '))
+                    break
+                except:
+                    ...
+            if roe_value == 999999:
+                continue
+            roe_list = [roe_value] * 7
+            while True:
+                mos_tmp = input('>>>> 请输入MOS筛选值上下限(a,b形式,ab均为数字型, 999999重新选择策略) <<<< ')
+                if mos_tmp == '999999':
+                    break
+                mos_list = mos_tmp.split(',')
+                try:
+                    a = float(mos_list[0])
+                    b = float(mos_list[1])
+                    mos_range = [a, b]
+                    if -1 <= a <= b <= 1:
+                        break
+                except:
+                    ...
+            if mos_tmp == '999999':  # 双点退出
+                continue
+            while True:
+                try:
+                    multi_value = float(input('>>>> 请输入国债收益率倍数(数字型, 999999重新选择策略) <<<< '))
+                    if multi_value >= 0:
+                        break
+                except:
+                    ...
+            if multi_value == 999999:
+                continue
+            print('正在执行ROE-MOS-MULTI-YIELD选股策略,请稍等......')
+            print('++'*50)
+            res = stockbacktest.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range, multi_value=multi_value)
+
+        
+        
+        
+        
+        
+        
         elif msg.upper() == 'QUIT':
             break
         else:

@@ -244,6 +244,41 @@ def get_indicator_in_trade_record(code: str, date: str, fields: str) -> float:
     row = find_closest_row_in_trade_record(code, date)
     return row[fields].values[0]
 
+def draw_10y_yield_curve_figure():
+    """
+    绘制10年期国债到期收益率曲线图.
+    """
+    con = sqlite3.connect(CURVE_SQLITE3)
+    with con:
+        df = pd.read_sql(f"SELECT * FROM '{CURVE_TABLE}'", con)
+    date = df['date1'].tolist()[::-1]
+    value = df['value1'].tolist()[::-1]
+    plt.plot(date, value)
+    plt.rcParams['font.sans-serif'] = ['Songti SC'] # 设置中文显示
+    plt.fill_between(date, value, color='grey', alpha=0.1)
+    plt.title(f"10年期国债到期收益率曲线图(自 {date[0]} 到 {date[-1]})")
+    plt.xticks(
+        [date[0], date[len(date)//4], date[len(date)//2], 
+        date[len(date)//4*3], date[-1]]
+    )    # x轴平均显示5个日期
+    plt.gca().yaxis.set_major_formatter(
+        plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x, 2)))
+    )  # 设置y轴刻度
+    max_value = max(value)    # 设置最高点和最低点
+    min_value = min(value)
+    max_date = date[value.index(max_value)]
+    min_date = date[value.index(min_value)]
+    plt.text(
+        max_date, max_value, f"最高点: {max_value:.4}%", ha='center', va='bottom', fontsize=12
+    )
+    plt.text(
+        min_date, min_value, f"最低点: {min_value:.4}%", ha='center', va='top', fontsize=12
+    )
+    plt.gca().yaxis.grid(True)  # 显示网格
+    fig = plt.gcf()
+    fig.set_size_inches(16, 10)
+    plt.show()
+
 def save_whole_MOS_7_figure(code: str, dest: str, show_figure: bool = False):
     """ 
     绘制完整的MOS_7图形保存到指定目录.
