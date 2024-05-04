@@ -100,7 +100,7 @@ class Strategy:
                 mos_range.sort()
                 if mos_range[1] - mos_range[0] > mos_step:
                     mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
-                multi_list = np.arange(0, 5, 0.1)  # 倍数列表
+                multi_list = np.arange(0, 3, 0.1)  # 倍数列表
                 multi_value = round(np.random.choice(multi_list, 1)[0], 2)
                 tmp = {
                     'strategy': strategy.upper(),
@@ -878,9 +878,11 @@ class Strategy:
 if __name__ == "__main__":
     stockbacktest = Strategy()
     while True:
-        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-        print('+++++++ ROE ROE-DIVIDEND ROE-MOS ROE-MOS-DIVIDEND ROE-MOS-MULTI-YIELD QUIT ++++++++')
-        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+        print('+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+')
+        print('+                                                                     +')
+        print('+ ROE ROE-DIVIDEND ROE-MOS ROE-MOS-DIVIDEND ROE-MOS-MULTI-YIELD QUIT  +')
+        print('+                                                                     +')
+        print('+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+')
         msg = input('>>>> 请选择操作提示 <<<< ')
         if msg.upper() == 'ROE':
             while True:
@@ -1037,13 +1039,6 @@ if __name__ == "__main__":
             print('正在执行ROE-MOS-MULTI-YIELD选股策略,请稍等......')
             print('++'*50)
             res = stockbacktest.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range, multi_value=multi_value)
-
-        
-        
-        
-        
-        
-        
         elif msg.upper() == 'QUIT':
             break
         else:
