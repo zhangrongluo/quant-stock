@@ -8,14 +8,14 @@ import numpy as np
 from typing import List, Dict, Union
 import utils
 import tsswindustry as sw
-from path import INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3
+from path import INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, STRATEGIES, MOS_STEP
 
 class Strategy:
     def __init__(self):
         pass
 
     @staticmethod
-    def generate_ROE_test_conditions(strategy: str, items: int = 10, mos_step: float = 0.25) -> List[Dict]:
+    def generate_ROE_test_conditions(strategy: str, items: int = 10, mos_step: float = MOS_STEP) -> List[Dict]:
         """
         生成测试条件列表,用于测试策略
         :param strategy: 策略名称, 例如: 'roe', 'roe-dividend', 'roe-mos', 'roe-mos-dividend', 'roe-mos-multi-yield'
@@ -28,8 +28,8 @@ class Strategy:
         mos_range取值范围为[-1, 1], 超过win-stock系统预设值[0.2, 1],但是step限制为不大于0.25
         dividend取值范围为[0, 10], 和win-stock系统预设值[0, 10]相同
         """
-        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']:
-            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS, ROE-MOS-DIVIDEND, ROE-MOS-MULTI-YIELD)')
+        if strategy.upper() not in STRATEGIES:
+            raise ValueError(f'请检查策略名称是否在列表中({STRATEGIES})')
 
         condition = []  # 定义返回值
         if strategy.upper() == 'ROE':
@@ -167,8 +167,8 @@ class Strategy:
         quant-stock系统速度慢,相比win-stock而言,主打测试较小的组合.
         如果result参数时间组平均持股数量大于15,直接返回定制的测试结果
         """
-        if strategy.upper() not in ['ROE', 'ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']:
-            raise ValueError('请检查策略名称是否正确(ROE, ROE-DIVIDEND, ROE-MOS, ROE-MOS-DIVIDEND, ROE-MOS-MULTI-YIELD)')
+        if strategy.upper() not in STRATEGIES:
+            raise ValueError(f'请检查策略名称是否在列表中({STRATEGIES})')
         if not all([item in ['000300', '399006', '000905'] for item in index_list]):
             raise ValueError('请检查指数代码是否正确')
         test_result = {date: [] for date in result.keys()}  # 定义返回值
@@ -179,7 +179,7 @@ class Strategy:
         
         for date, stocks in sorted(result.items(), key=lambda x: x[0]):  # 对每个时间组的选股结果进行回测
             code_list = [item[0][0:6] for item in stocks]  # 不含后缀
-            if strategy.upper() in ['ROE', 'ROE-MOS', 'ROE-DIVIDEND', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']:  # roe type strategy
+            if strategy.upper() in STRATEGIES:  # roe type strategy
                 start_date = str(int(date[1:5])+1)+'-06-01'
                 end_date = str(int(date[1:5])+2)+'-06-01'
             else:
@@ -476,7 +476,7 @@ class Strategy:
         sqlite_file: str = TEST_CONDITION_SQLITE3,
         times: int = 10, 
         display: bool = False,
-        mos_step: float = 0.25
+        mos_step: float = MOS_STEP
         ):
         """
         测试回测类的闭环效果,测试对象为随机生成的测试条件
@@ -491,7 +491,7 @@ class Strategy:
         number = 0
         for i in range(times):
             print(f'第{i+1}轮测试......'.ljust(120, ' '))
-            strategy = random.choice(['ROE-MOS', 'ROE-DIVIDEND', 'ROE', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD'])
+            strategy = random.choice(STRATEGIES)
             items = random.randint(1, 5)
             number += items
             condition_list = self.generate_ROE_test_conditions(strategy=strategy, items=items, mos_step=mos_step)

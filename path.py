@@ -36,3 +36,8 @@ CURVE_TABLE = "curve"  # curve.sqlite3中的表
 
 # iMac本地仓库路径
 IMAC_REPOSITORY_PATH = "/Users/zhangrongluo/Desktop/pythonzone/win-stock-conditions/win-stock-conditions"
+
+# 策略列表,屏蔽了ROE和ROE-PE-PB策略
+STRATEGIES = ['ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']
+# MOS策略的步长
+MOS_STEP = 0.25  
