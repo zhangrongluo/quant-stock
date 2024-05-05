@@ -100,7 +100,7 @@ class Strategy:
                 mos_range.sort()
                 if mos_range[1] - mos_range[0] > mos_step:
                     mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
-                multi_list = np.arange(0, 3, 0.1)  # 倍数列表
+                multi_list = np.arange(0.5, 2, 0.1)  # 倍数列表
                 multi_value = round(np.random.choice(multi_list, 1)[0], 2)
                 tmp = {
                     'strategy': strategy.upper(),
@@ -476,7 +476,7 @@ class Strategy:
         sqlite_file: str = TEST_CONDITION_SQLITE3,
         times: int = 10, 
         display: bool = False,
-        restest_or_not: bool = False,
+        mos_step: float = 0.25
         ):
         """
         测试回测类的闭环效果,测试对象为随机生成的测试条件
@@ -484,7 +484,7 @@ class Strategy:
         :param sqlite_file: 保存测试结果的sqlite3数据库文件
         :param times: 测试次数
         :param display: 是否显示中间结果
-        :param restest_or_not: 是否重新测试
+        :param mos_step: 生成的测试条件中MOS_RANGE的最大步长
         :return: None
         """
         start = time.time()
@@ -493,7 +493,6 @@ class Strategy:
             print(f'第{i+1}轮测试......'.ljust(120, ' '))
             strategy = random.choice(['ROE-MOS', 'ROE-DIVIDEND', 'ROE', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD'])
             items = random.randint(1, 5)
-            mos_step = random.uniform(0.1, 0.30)
             number += items
             condition_list = self.generate_ROE_test_conditions(strategy=strategy, items=items, mos_step=mos_step)
             if display:
