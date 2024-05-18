@@ -100,7 +100,7 @@ class Strategy:
                 mos_range.sort()
                 if mos_range[1] - mos_range[0] > mos_step:
                     mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
-                multi_list = np.arange(0.5, 2, 0.1)  # 倍数列表
+                multi_list = np.arange(0.5, 3.5, 0.1)  # 倍数列表
                 multi_value = round(np.random.choice(multi_list, 1)[0], 2)
                 tmp = {
                     'strategy': strategy.upper(),
@@ -499,7 +499,7 @@ class Strategy:
                 print('+'*120)
                 print(condition_list)
             for condition in condition_list:  # 测试
-                print(f'测试条件：{condition}'.ljust(120, ' '))
+                print(f'测试条件(From quant-stock):{condition}'.ljust(120, ' '))
                 self.test_strategy_specific_condition(
                     condition=condition, display=display, 
                     sqlite_file=sqlite_file, table_name=table_name
@@ -555,7 +555,7 @@ class Strategy:
                 src_sqlite3=dest_sqlite3, src_table=dest_table
             )
             if condition not in tmp_conditons:
-                print(f'正在重新测试条件：{condition}'.ljust(120, ' '))
+                print(f'正在重新测试条件(From quant-stock): {condition}'.ljust(120, ' '))
                 self.test_strategy_specific_condition(
                     condition=condition, display=False, 
                     sqlite_file=dest_sqlite3, table_name=dest_table
