@@ -849,6 +849,8 @@ class Strategy:
         :return: 综合排序后的条件集(strategy test_conditon valid_groups_keys 
         basic_ratio inner_rate down_max sum_rank date)
         """
+        if not os.path.exists(sqlite_name):
+            return
         con = sqlite3.connect(sqlite_name)
         with con:
             sql = f"""

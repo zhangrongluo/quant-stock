@@ -437,10 +437,8 @@ def update_trade_record_csv(code: str):
     # 获取日期
     csv_file = os.path.join(TRADE_RECORD_PATH, sw.get_name_and_class_by_code(code=code)[1], code+'.csv')
     if not os.path.exists(csv_file):
-        raise FileNotFoundError(f"未发现{csv_file}历史交易记录文件,请检查.")
+        create_trade_record_csv_table(code)
     df_old = pd.read_csv(csv_file)
-    if df_old.empty:
-        raise Exception(f"{csv_file}文件内容为空,请先使用create_...函数创建表格.")
     last_date = df_old.loc[0, 'trade_date']  # int64型
     last_date = datetime.datetime.strptime(str(last_date), '%Y%m%d')
     start_date = (last_date + datetime.timedelta(days=1)).strftime('%Y%m%d')  # 获取last_date第二天的日期, str型
