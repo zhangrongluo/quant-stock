@@ -28,7 +28,10 @@ def get_IPO_date(code: str) -> str:
     ipo_data = "1991-01-01"
     full_code = code + '.SH' if code.startswith('6') else code + '.SZ'
     pro = ts.pro_api()
-    df = pro.query('stock_basic', exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date')
+    df = pro.query(
+        'stock_basic', exchange='', list_status='L', 
+        fields='ts_code,symbol,name,area,industry,list_date'
+        )
     try:
         ipo_data = df[df['ts_code'] == full_code]['list_date'].values[0]
         ipo_data = ipo_data[0:4] + '-' + ipo_data[4:6] + '-' + ipo_data[6:8]
@@ -38,16 +41,26 @@ def get_IPO_date(code: str) -> str:
 
 def get_whole_trade_record_data(code: str) -> pd.DataFrame:
     """
-    使用tushare获取股票历史交易记录文件,从上市日至今.包括ts_code,trade_date,pe_ttm,pb,ps_ttm,dv_ttm,total_mv,circ_mv列
+    使用tushare获取股票历史交易记录文件,从上市日至今.包括ts_code,trade_date,pe_ttm,
+    pb,ps_ttm,dv_ttm,total_mv,circ_mv和pct_chg列
     :param code: 股票代码, 例如: '600000' or '000001'
     :return: 股票历史交易记录文件
     """
     full_code = code + '.SH' if code.startswith('6') else code + '.SZ'
     pro = ts.pro_api()
-    result = pro.daily_basic(ts_code=full_code,fields='ts_code,trade_date,pe_ttm,pb,ps_ttm,dv_ttm,total_mv,circ_mv')
+    result = pro.daily_basic(
+        ts_code=full_code,
+        fields='ts_code,trade_date,pe_ttm,pb,ps_ttm,dv_ttm,total_mv,circ_mv'
+        )
     tmp = sw.get_name_and_class_by_code(code=code)  # 插入公司简称和行业分类
     result.insert(2, 'company', tmp[0])
     result.insert(3, 'industry', tmp[1])
+    # 获取历史涨幅，以trade_date为索引，合并到result中
+    tmp = pro.daily(ts_code=full_code, fields='trade_date,pct_chg')
+    tmp = tmp.set_index('trade_date')
+    result = result.set_index('trade_date')
+    result = result.join(tmp, how='inner')
+    result.reset_index(inplace=True)
     return result
 
 def get_ROE_indicators_from_Tushare(code: str) -> Dict:
@@ -152,6 +165,8 @@ def check_stockcodes_integrity(
     # 比较两者的差异,储存缺失的股票代码
     for stock_class in sw_classes:
         dest_dir = os.path.join(trade_record_path, stock_class)
+        if not os.path.exists(dest_dir):
+            os.mkdir(dest_dir)
         trade_files = os.listdir(dest_dir)
         trade_codes = [f.split('.')[0] for f in trade_files if f.endswith(".csv")]
         dest_stocks = sw.get_stocks_of_specific_class(stock_class=stock_class)
@@ -276,7 +291,7 @@ def create_trade_record_csv_table(code: str, rm_empty_rows: bool = False) -> Non
     file_name = code + '.csv'
     file_path = os.path.join(TRADE_RECORD_PATH, swindustry, file_name)
     df.to_csv(file_path, index=False)
-    print(f'{code}历史交易记录文件下载成功,保存在{dest_path}目录下.'+ '\r', end='', flush=True)
+    print(f'{code}历史交易记录文件下载成功,保存在{swindustry}目录下.'+ ' '*50+ '\r', flush=True)
 
 def create_specific_class_trade_record_csv_table(stock_class: str, rm_empty_rows: bool = False):
     """
@@ -438,17 +453,25 @@ def update_trade_record_csv(code: str):
     csv_file = os.path.join(TRADE_RECORD_PATH, sw.get_name_and_class_by_code(code=code)[1], code+'.csv')
     if not os.path.exists(csv_file):
         create_trade_record_csv_table(code)
-    df_old = pd.read_csv(csv_file)
+    df_old = pd.read_csv(csv_file, dtype={'trade_date': str})
     last_date = df_old.loc[0, 'trade_date']  # int64型
     last_date = datetime.datetime.strptime(str(last_date), '%Y%m%d')
     start_date = (last_date + datetime.timedelta(days=1)).strftime('%Y%m%d')  # 获取last_date第二天的日期, str型
     end_date = time.strftime('%Y%m%d', time.localtime(time.time()))
-    
     # 获取数据
     full_code = code + '.SH' if code.startswith('6') else code + '.SZ'
     pro = ts.pro_api()
     df1 = pro.daily_basic(ts_code=full_code, start_date=start_date, end_date=end_date, 
     fields=["ts_code","trade_date","pe_ttm","pb","ps_ttm","circ_mv","dv_ttm","total_mv"])
+    # 获取历史涨幅，以trade_date为索引，合并到df1中
+    tmp = pro.daily(
+        ts_code=full_code, start_date=start_date, end_date=end_date, 
+        fields='trade_date,pct_chg'
+        )
+    tmp = tmp.set_index('trade_date')
+    df1 = df1.set_index('trade_date')
+    df1 = df1.join(tmp, how='inner')
+    df1.reset_index(inplace=True)
     if df1.empty:
         print(f"{full_code}无可更新数据." + ' '*20 + '\r', end='', flush=True)
         return  # 如果df1为空,则无可更新数据,直接返回
@@ -495,31 +518,31 @@ if __name__ == '__main__':
             break
         elif msg.upper() == 'CREATE-TRADE-CSV':
             print('正在创建trade-record csv文件,请稍等...\r', end='', flush=True)
-            for stock in stocks:
-                create_trade_record_csv_table(stock)
-            # create_all_stocks_trade_record_csv_table()  # 使用线程池经常会中断,原因未知
-            print('trade-record csv文件创建成功.'+ ' '*20)
+            # for stock in stocks:
+            #     create_trade_record_csv_table(stock)
+            create_all_stocks_trade_record_csv_table()  # 使用线程池经常会中断,原因未知
+            print('trade-record csv文件创建成功.'+ ' '*50)
         elif msg.upper() == 'CREATE-CURVE':
             print('正在创建curve表格,请稍等...\r', end='', flush=True)
             begin = datetime.date(2006, 3, 1)
             yesterday = datetime.date.today() + datetime.timedelta(days=-1)
             days = (yesterday - begin).days
             create_curve_value_table(days=days)
-            print('curve表格创建成功.'+ ' '*20)
+            print('curve表格创建成功.'+ ' '*50)
         elif msg.upper() == 'CREATE-ROE-TABLE':
             print('正在创建indicators表格,请稍等...\r', end='', flush=True)
             with ThreadPoolExecutor() as pool:
                 pool.map(create_ROE_indicators_table_from_1991, stocks)
-            print('indicators表格创建成功.'+ ' '*20)
+            print('indicators表格创建成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-TRADE-CSV':
             print('正在更新trade-record csv文件,请稍等...\r', end='', flush=True)
             for stock in stocks:
                 update_trade_record_csv(stock)
-            print('trade-record csv文件更新成功.'+ ' '*20)
+            print('trade-record csv文件更新成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-CURVE':
             print('正在更新curve表格,请稍等...\r', end='', flush=True)
             update_curve_value_table()
-            print('curve表格更新成功.'+ ' '*20)
+            print('curve表格更新成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-ROE-TABLE':
             print('正在更新indicators表格,请稍等...\r', end='', flush=True)
             con = sqlite3.connect(INDICATOR_ROE_FROM_1991)
@@ -532,7 +555,7 @@ if __name__ == '__main__':
                 null_stocks = [code[0:6] for code in null_stocks]
             with ThreadPoolExecutor() as pool:
                 pool.map(update_ROE_indicators_table_from_1991, null_stocks)
-            print('indicators表格更新成功.'+ ' '*20)
+            print('indicators表格更新成功.'+ ' '*50)
         elif msg.upper() == 'CREATE-INDEX-VALUE':
             print('正在创建指数估值数据库,请稍等...\r', end='', flush=True)
             for index in ["000300", "000905", "399006"]:
@@ -554,7 +577,7 @@ if __name__ == '__main__':
                 )
                 file_name = os.path.join(TEST_CONDITION_PATH, f"conditions-by-mode{mode}.xlsx")
                 df.to_excel(file_name, index=False)
-            print('条件表格排序成功.'+ ' '*20)
+            print('条件表格排序成功.'+ ' '*50)
         elif msg.upper() == 'CHECK-INTEGRITY':
             res = check_stockcodes_integrity()
             if not res["roe_table"] and not res["trade_record_path"]:

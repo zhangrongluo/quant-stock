@@ -8,6 +8,7 @@ import random
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Dict, Union
 import tushare as ts
+import data
 import tsswindustry as sw
 from path import (INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, CURVE_TABLE, 
                 ROE_TABLE, TRADE_RECORD_PATH, INDEX_VALUE)
@@ -168,7 +169,13 @@ def calculate_stock_rising_value(code: str, start_date: str, end_date: str) -> f
     if date_regex.match(end_date):
         end_date = end_date.replace('-', '')
     full_code = f'{code}.SH' if code.startswith('6') else f'{code}.SZ'
-    df = ts.pro_bar(ts_code=full_code, start_date=start_date, end_date=end_date)
+    swindustry = sw.get_name_and_class_by_code(code)[1]
+    csv_file = os.path.join(TRADE_RECORD_PATH, swindustry, f"{code}.csv")
+    if not os.path.exists(csv_file):
+        data.create_trade_record_csv_table(code)
+    df = pd.read_csv(csv_file, dtype={'trade_date': str, "trade_date": str})
+    df = df[(df['trade_date'] >= start_date)]
+    df = df[(df['trade_date'] <= end_date)]
     if df is None or df.empty:
         rate = 0.00
     else:

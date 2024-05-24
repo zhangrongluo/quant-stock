@@ -39,5 +39,6 @@ IMAC_REPOSITORY_PATH = "/Users/zhangrongluo/Desktop/pythonzone/win-stock-conditi
 
 # 策略列表,屏蔽了ROE和ROE-PE-PB策略
 STRATEGIES = ['ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']
-# MOS策略的步长
-MOS_STEP = 0.25  
+MOS_STEP = 0.25  # MOS步长
+HOLDING_TIME = [6, 12]  # 每个时间组持有时间
+FIRST_TRADE_DATE = ["06", "01"]  # 每个时间组的第一个交易日

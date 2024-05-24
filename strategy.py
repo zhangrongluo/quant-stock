@@ -8,7 +8,8 @@ import numpy as np
 from typing import List, Dict, Union
 import utils
 import tsswindustry as sw
-from path import INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, STRATEGIES, MOS_STEP
+from path import (INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, 
+                STRATEGIES, MOS_STEP, HOLDING_TIME, FIRST_TRADE_DATE)
 
 class Strategy:
     def __init__(self):
@@ -27,6 +28,7 @@ class Strategy:
         period取值范围为[5, 10], 和win-stock系统预设值[5, 10]相同
         mos_range取值范围为[-1, 1], 超过win-stock系统预设值[0.2, 1],但是step限制为不大于0.25
         dividend取值范围为[0, 10], 和win-stock系统预设值[0, 10]相同
+        holding_time键20250523日以后新增的,以前的测试条件没有该键名,默认持股时间为12个月
         """
         if strategy.upper() not in STRATEGIES:
             raise ValueError(f'请检查策略名称是否在列表中({STRATEGIES})')
@@ -41,7 +43,8 @@ class Strategy:
                     'test_condition': {
                         'roe_list': [],  
                         'roe_value': roe_value, 
-                        'period': period
+                        'period': period,
+                        'holding_time': random.choice(HOLDING_TIME),
                     }
                 }
                 condition.append(tmp)
@@ -56,7 +59,8 @@ class Strategy:
                     'strategy': strategy.upper(), 
                     'test_condition': {
                         'roe_list': [roe_value]*7, 
-                        'mos_range': mos_range
+                        'mos_range': mos_range,
+                        'holding_time': random.choice(HOLDING_TIME),
                     }
                 }
                 condition.append(tmp)
@@ -71,7 +75,8 @@ class Strategy:
                     'test_condition': {
                         'roe_list': roe_list,
                         'period': period,
-                        'dividend': dividend
+                        'dividend': dividend,
+                        'holding_time': random.choice(HOLDING_TIME),
                     }
                 }
                 condition.append(tmp)
@@ -88,7 +93,8 @@ class Strategy:
                     'test_condition': {
                         'roe_list': [roe_value]*7,
                         'mos_range': mos_range,
-                        'dividend': dividend
+                        'dividend': dividend,
+                        'holding_time': random.choice(HOLDING_TIME),
                     }
                 }
                 condition.append(tmp)
@@ -107,7 +113,8 @@ class Strategy:
                     'test_condition': {
                         'roe_list': [roe_value]*7,
                         'mos_range': mos_range,
-                        'multi_value': multi_value
+                        'multi_value': multi_value,
+                        'holding_time': random.choice(HOLDING_TIME),
                     }
                 }
                 condition.append(tmp)
@@ -141,8 +148,8 @@ class Strategy:
             for item in value:
                 print(item)
                 stock_codes.append(item[0][0:6])
-            start_date = str(int(key[1:5])+1)+'-06-01'
-            end_date = str(int(key[1:5])+2)+'-06-01'
+            start_date = key.split(":")[1]
+            end_date = key.split(":")[2]
             res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
             print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
             res = utils.calculate_index_rising_value('000300', start_date, end_date)
@@ -179,13 +186,8 @@ class Strategy:
         
         for date, stocks in sorted(result.items(), key=lambda x: x[0]):  # 对每个时间组的选股结果进行回测
             code_list = [item[0][0:6] for item in stocks]  # 不含后缀
-            if strategy.upper() in STRATEGIES:  # roe type strategy
-                start_date = str(int(date[1:5])+1)+'-06-01'
-                end_date = str(int(date[1:5])+2)+'-06-01'
-            else:
-                start_date = date
-                end_date_tmp = datetime.datetime.strptime(date, '%Y-%m-%d') + datetime.timedelta(days=183)
-                end_date = end_date_tmp.strftime('%Y-%m-%d')
+            start_date = date.split(":")[1]
+            end_date = date.split(":")[2]
             stock_return = utils.calculate_portfolio_rising_value(code_list, start_date, end_date)  # 获取组合的收益率
             test_result[date].append(stock_return)
             if index_list:  # 获取指数的收益率
@@ -237,15 +239,17 @@ class Strategy:
         basic_ratio = win_count / len(valid_groups) if valid_groups else 0
         evaluate_result['basic_ratio'] = round(basic_ratio, 4)
 
-        # 计算inner_rate 和 down_max
-        # TODO:
-        # 当时间组间隔不等于1年的情况下,是否需要调整？
+        # 计算inner_rate 和 down_max,inner_rate为有效时间组内在年化收益率,down_max为有效时间组单期最大回撤
         rate_list = []
         total_return = 1
+        # 获取持股时间。20230523以前的测试条件没有持股时间键名,默认持股时间为12个月
+        holding_time = test_condition['test_condition'].get('holding_time', 12) 
         for date, stocks in valid_groups.items():
             total_return *= (1 + portfolio_test_result[date][0])
             rate_list.append(portfolio_test_result[date][0])
-        inner_rate = total_return ** (1 / len(valid_groups)) - 1 if valid_groups else 0
+        # 将有效时间组的总时长转换为年数，用于计算内在年化收益率
+        years = evaluate_result['valid_groups'] * holding_time / 12
+        inner_rate = total_return ** (1 / years) - 1 if valid_groups else 0
         evaluate_result['inner_rate'] = round(inner_rate, 4)
         evaluate_result['down_max'] = round(min(rate_list), 4) if valid_groups else 0
 
@@ -437,10 +441,6 @@ class Strategy:
             result = self.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
         elif strategy == 'ROE-MOS-MULTI-YIELD':
             result = self.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(**condition['test_condition'])
-        # 如果当前月份是5月,则删除第一个时间组的数据，
-        # 因为改时间组投资组合和指数的收益均为0，没有意义
-        if time.localtime().tm_mon == 5:
-            result.pop(list(result.keys())[0])
         if display:
             print('+'*120)
             print(result)
@@ -560,17 +560,36 @@ class Strategy:
                     condition=condition, display=False, 
                     sqlite_file=dest_sqlite3, table_name=dest_table
                 )
-    
+    #############################################################################################
+    # 以下是选股策略的具体实现。让我们想象一下，沿着数据库的数据库的时间字段序列滑动，每次一年，以7年为一个时间组。
+    # 依次取出每个时间组Y2023-Y2017, Y2022-Y2016, Y2021-Y2015, Y2020-Y2014......将时间组依次排列，把它
+    # 看成一列火车，每节车厢对应一个时间组。现在全部车厢都是空的，表示还没有选股。选股策略其实就是不同的过滤器或者
+    # 过滤的组合。
+    # 现在假设每个时间组的股票持有期为12个月（默认），现在加入最底层的过滤器ROE开始选股，每个车厢里都有了合适的股
+    # 票，然后再加个一个过滤器MOS，在此筛选后，得到了合适的股票。依次类推，还可以加个第三个过滤器股息率，再筛选一次。
+    # 现在假设持股期限为6个月，重新筛选一次。
+    # 同样首先在每节车厢里加入底层过滤器ROE，得到筛选结果。然后将每节车厢一分为2(12/6)，每个部分的长度为6个月，每个
+    # 部分里面的股票都是一样的。然后在每个部分再加入第二个过滤器MOS，得到筛选结果。再加入第三个过滤器股息率，得到筛选
+    # 结果。
+    # 现在假设持股期限为3个月，重新筛选一次。
+    # 同样首先在每节车厢里加入底层过滤器ROE，得到筛选结果。然后将每节车厢一分为4(12/3)，分割后的长度为3个月，每个部
+    # 分里面的股票都是一样的。然后在每个部分再加入第二个过滤器MOS，得到筛选结果。再加入第三个过滤器股息率，得到筛选结
+    # 果。这个比喻可能不是很好，希望可以帮助记忆和理解。（2024-05-23）
+    ##############################################################################################
     @staticmethod
-    def ROE_only_strategy_backtest_from_1991(roe_list:List=[20]*5, roe_value=None, period:int=5) -> Dict:
+    def ROE_only_strategy_backtest_from_1991(
+        roe_list:List=[20]*5, roe_value=None, period:int=5, holding_time:int=12
+        ) -> Dict:
         """
         带有回测功能的单一ROE选股策略, 从1991年开始回测.筛选过程中使用INDICATOR_ROE_FROM_1991数据库的年度roe数据.
         年度财务指标公布完成是4月30日,为避免信息误差的问题,以此构建组合的时间应该在第二年5月份以后,
         :param roe_list: roe筛选列表,函数按照提供的参数值对股票进行筛选.提供了这个参数,则忽略roe_value参数.列表长度等于period.
         :param roe_value: roe筛选值,函数将其转化为一个相同元素的列表,列表长度等于period.
         :param period: 筛选条件中roe数据包含的年份数. 
-        :return:返回值为字典格式,键为时间组,标明ROE起止期间, 值标明选出股票代码集合及期间内年度ROE值.
-        比如'Y2000-Y1994': [...], 表示该时间组选股是以1994年-2000年ROE值为筛选条件,列表内元素为选股结果,该列表是一个复合列表.
+        :param holding_time: 持有时间,默认为12个月.
+        :return:返回值为字典格式,键为时间组,标明ROE起止期间和持股, 值标明选出股票代码集合及期间内年度ROE值.
+        比如'Y2023-Y2014:2024-06-01:2024-10-01': [...], 表示该时间组是以2014年-2023年ROE值为数据源,该组合的持股时间为
+        2024-06-01:2024-10-01,列表内元素为选股结果,每个元素内容包括股票代码,股票名称,股票行业,以及每年的ROE值.
         """
         if roe_list and len(roe_list) != period:
             raise ValueError('roe_list列表长度应等于period')
@@ -580,7 +599,9 @@ class Strategy:
             raise ValueError('roe_list和roe_value不能同时为空')
         if not roe_list and roe_value:
             roe_list = [roe_value]*period
-        
+        if holding_time not in HOLDING_TIME:
+            raise ValueError(f"持有时间参数应为{HOLDING_TIME}中的一个")
+
         result = {}  # 定义返回值
         con = sqlite3.connect(INDICATOR_ROE_FROM_1991)
         with con:
@@ -588,7 +609,6 @@ class Strategy:
             df = pd.read_sql_query(sql, con)
             columns = df.columns
             del df
-
             sw_stocks = sw.get_all_stocks()
             sw_codes = [item[0] for item in sw_stocks]  # 申万行业分类股票代码集合
             for index, item in enumerate(columns):
@@ -611,9 +631,26 @@ class Strategy:
                     # 检查res股票清单是否在申万行业分类取票sw_codes中
                     res = [item for item in res if item[0] in sw_codes]
                     # 检查res股票清单是否在sw行业指数中
-                    trade_date = str(int(columns[index][1:5])+1)+'-06-01'
-                    res = [item for item in res if sw.in_index_or_not(item[0][:6], trade_date)]
-                    result[f"""{columns[index]}-{columns[index+period-1]}"""] = res
+                    time_tail = "-" + FIRST_TRADE_DATE[0] + "-" + FIRST_TRADE_DATE[1]  # -06-01
+                    first_trade_date = str(int(columns[index][1:5])+1) + time_tail
+                    res = [item for item in res if sw.in_index_or_not(item[0][:6], first_trade_date)]
+                    # 根据持有时间切分“车厢”, 将res赋值给每个“车厢”
+                    parts = 12 / holding_time
+                    first_key = f"""{columns[index]}-{columns[index+period-1]}:"""  # 时间组键名第一部分
+                    end_trade_date = str(int(columns[index][1:5])+2) + time_tail
+                    date_range = pd.date_range(
+                        first_trade_date, end_trade_date, freq=f'{holding_time}MS'
+                    ).strftime('%Y-%m-%d').tolist()
+                    today = datetime.datetime.now().strftime('%Y-%m-%d')
+                    for item in range(int(parts)):
+                        if date_range[item] > today:  # 持股起点还未到，取消该时间组
+                            break
+                        elif date_range[item+1] > today:  # 持股终点还未到，以今天为终点
+                            second_key = f"{date_range[item]}:{today}"
+                        else:
+                            second_key = f"{date_range[item]}:{date_range[item+1]}"
+                        time_key = first_key + second_key
+                        result[time_key] = res
         return result
 
     def ROE_DIVIDEND_strategy_backtest_from_1991(
@@ -621,15 +658,15 @@ class Strategy:
         roe_list: List, 
         period: int, 
         dividend: float,
+        holding_time: int = 12
     ) -> Dict:
         """
         ROE+股息率选股策略, 从1991年开始回测.筛选过程中使用INDICATOR_ROE_FROM_1991数据库的年度roe数据.
         :param roe_list: roe筛选列表,函数按照提供的参数值对股票进行筛选.提供了这个参数,则忽略roe_value参数.列表长度等于period.
         :param period: 筛选条件中roe数据包含的年份数.
         :param dividend: 股息率筛选值,在筛选出的股票中再次筛选,筛选条件为股息率大于等于dividend.
-        :return: 返回值为字典格式。字典键为时间组,标明ROE起止期间, 值标明选出股票代码集合及期间内年度ROE值.
-        比如'Y2000-Y1994': [...], 表示该时间组选股是以1994年-2000年ROE值为筛选条件,
-        列表内元素为选股结果,该列表是一个复合列表.(2023-04-24)
+        :param holding_time: 持有时间,默认为12个月.
+        :return: 返回值为字典格式。字典键为时间组,标明ROE起止期间及持股期间, 值标明选出股票代码集合及期间内年度ROE值.
         """
         if roe_list and len(roe_list) != period:
             raise Exception('roe_list列表长度和period不相等')
@@ -637,11 +674,15 @@ class Strategy:
             raise Exception('roe_list列表元素应为浮点数或者整数')
         if dividend < 0:
             dividend = 0
+        if holding_time not in HOLDING_TIME:
+            raise Exception(f"持有时间参数应为{HOLDING_TIME}中的一个")
 
         result = {}  # 定义返回值
-        tmp_result = self.ROE_only_strategy_backtest_from_1991(roe_list=roe_list, period=period)
+        tmp_result = self.ROE_only_strategy_backtest_from_1991(
+            roe_list=roe_list, period=period, holding_time=holding_time
+        )
         for date, stocks in tmp_result.items():  # 股息率筛选
-            tmp_date = f"{int(date[1:5])+1}"+'-06-01'  # 目标日期行
+            tmp_date = date.split(':')[1]  # 持股期间的起点
             tmp_stocks = []  # 保存筛选结果
             for stock in stocks: 
                 tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
@@ -650,11 +691,15 @@ class Strategy:
             result[date] = tmp_stocks
         return result
 
-    def ROE_MOS_strategy_backtest_from_1991(self, roe_list: List, mos_range: List) -> Dict:
+    def ROE_MOS_strategy_backtest_from_1991(
+        self, roe_list: List, mos_range: List, holding_time: int = 12
+        ) -> Dict:
         """
         本策略在ROE_only的基础上,对每一时间组的测试结果再通过MOS_7筛选一次.
         roe_list和period: 含义和使用方法和ROE_only_strategy_backtest_from_1991方法相同.
         mos_range: mos_7筛选条件列表,长度为2,元素类型为整数或者浮点数.
+        holding_time: 持有时间,默认为12个月.
+        :return: 返回值为字典,含义和ROE_only_strategy_backtest_from_1991方法相同.
         返回值为字典,含义和ROE_only_strategy_backtest_from_1991方法相同.
         """
         if len(roe_list) != 7:
@@ -666,10 +711,12 @@ class Strategy:
         if not all(map(lambda x: isinstance(x, int) or isinstance(x, float), mos_range)):
             raise Exception('mos筛选区间列表元素应为浮点数或者整数')
 
-        tmp_result = self.ROE_only_strategy_backtest_from_1991(roe_list=roe_list, period=7)
-        result = {date: item for date, item in tmp_result.items() if int(date[7:11]) >= 1999}  # 定义返回值（1999-2005序列）
+        tmp_result = self.ROE_only_strategy_backtest_from_1991(
+            roe_list=roe_list, period=7, holding_time=holding_time
+        )
+        result = {date: item for date, item in tmp_result.items() if int(date[7:11]) >= 1999}  # 定义返回值
         for date, stocks in result.items():
-            tmp_date = f"{int(date[1:5])+1}"+'-06-01'
+            tmp_date = date.split(':')[1]  # 持股期间的起点
             tmp_stocks = []
             for stock in stocks:
                 mos_7 = utils.calculate_MOS_7_from_2006(code=stock[0][0:6], date=tmp_date)
@@ -682,13 +729,15 @@ class Strategy:
         self, 
         roe_list: List, 
         mos_range: List, 
-        dividend: float
+        dividend: float,
+        holding_time: int = 12
     ) -> Dict:
         """
         本策略在ROE_MOS的基础上,对每一时间组的测试结果再通过股息率筛选一次.
         :param roe_list: 含义和使用方法和ROE_only_strategy_backtest_from_1991方法相同.
         :param mos_range: 含义和使用方法和ROE_MOS_strategy_backtest_from_1991方法相同.
         :param dividend: 股息率筛选值,在筛选出的股票中再次筛选,筛选条件为股息率大于等于dividend.
+        :param holding_time: 持有时间,默认为12个月.
         :return: 返回值为字典,含义和ROE_only_strategy_backtest_from_1991方法相同.
         """
         if len(roe_list) != 7:
@@ -697,9 +746,11 @@ class Strategy:
             dividend = 0
 
         result = {}  # 定义返回值
-        tmp_result = self.ROE_MOS_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range)
+        tmp_result = self.ROE_MOS_strategy_backtest_from_1991(
+            roe_list=roe_list, mos_range=mos_range, holding_time=holding_time
+        )
         for date, stocks in tmp_result.items():  # 股息率筛选
-            tmp_date = f"{int(date[1:5])+1}"+'-06-01'
+            tmp_date = date.split(':')[1]  # 持股期间的起点
             tmp_stocks = []
             for stock in stocks:
                 tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
@@ -713,21 +764,25 @@ class Strategy:
         roe_list: List,
         mos_range: List,
         multi_value: float,
+        holding_time: int = 12
     ) -> Dict:
         """
         本策略和ROE_MOS_DIVIDEND类似,只是用每个交易日10年国债利率的倍数替代固定股息率.
         :param roe_list: 含义和使用方法和ROE_only_strategy_backtest_from_1991方法相同.
         :param mos_range: 含义和使用方法和ROE_MOS_strategy_backtest_from_1991方法相同.
         :param multi_value: 当期10年国债利率的倍数.
+        :param holding_time: 持有时间,默认为12个月.
         :return: 返回值为字典,含义和ROE_only_strategy_backtest_from_1991方法相同.
         """
         if len(roe_list) != 7:
             raise Exception('roe_list参数年份数应为7年')
 
         result = {}  # 定义返回值
-        tmp_result = self.ROE_MOS_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range)
+        tmp_result = self.ROE_MOS_strategy_backtest_from_1991(
+            roe_list=roe_list, mos_range=mos_range, holding_time=holding_time
+        )
         for date, stocks in tmp_result.items():  # 股息率筛选
-            trade_date = f"{int(date[1:5])+1}"+'-06-01'
+            trade_date = date.split(':')[1]  # 持股期间的起点
             row = utils.find_closest_row_in_curve_table(trade_date)
             yield_10 = row["value1"].values[0]
             multi_yield = yield_10 * multi_value  # 当期10年国债利率的倍数
@@ -904,9 +959,20 @@ if __name__ == "__main__":
             if period == 999999:  # 双点退出
                 continue
             roe_list = [roe_value]*period
+            while True:
+                try:
+                    holding_time = int(input(f'>>>> 请输入持有时间({HOLDING_TIME}, 999999重新选择策略) <<<< '))
+                    if holding_time in HOLDING_TIME or holding_time == 999999:
+                        break
+                except:
+                    ...
+            if holding_time == 999999:  # 双点退出
+                continue 
             print('正在执行ROE选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_only_strategy_backtest_from_1991(roe_list=roe_list, period=period)
+            res = stockbacktest.ROE_only_strategy_backtest_from_1991(
+                roe_list=roe_list, period=period, holding_time=holding_time
+                )
         elif msg.upper() == 'ROE-DIVIDEND':
             while True:
                 try:
@@ -935,9 +1001,20 @@ if __name__ == "__main__":
                     ...
             if dividend == 999999:
                 continue
+            while True:
+                try:
+                    holding_time = int(input(f'>>>> 请输入持有时间({HOLDING_TIME}, 999999重新选择策略) <<<< '))
+                    if holding_time in HOLDING_TIME or holding_time == 999999:
+                        break
+                except:
+                    ...
+            if holding_time == 999999:  # 双点退出
+                continue
             print('正在执行ROE-DIVIDEND选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_DIVIDEND_strategy_backtest_from_1991(roe_list=roe_list, period=period, dividend=dividend)
+            res = stockbacktest.ROE_DIVIDEND_strategy_backtest_from_1991(
+                roe_list=roe_list, period=period, dividend=dividend, holding_time=holding_time
+                )
         elif msg.upper() == 'ROE-MOS':
             while True:
                 try:
@@ -963,9 +1040,20 @@ if __name__ == "__main__":
                     ...
             if mos_tmp == '999999':  # 双点退出
                 continue
+            while True:
+                try:
+                    holding_time = int(input(f'>>>> 请输入持有时间({HOLDING_TIME}, 999999重新选择策略) <<<< '))
+                    if holding_time in HOLDING_TIME or holding_time == 999999:
+                        break
+                except:
+                    ...
+            if holding_time == 999999:  # 双点退出
+                continue
             print('正在执行ROE-MOS选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_MOS_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range)
+            res = stockbacktest.ROE_MOS_strategy_backtest_from_1991(
+                roe_list=roe_list, mos_range=mos_range, holding_time=holding_time
+                )
         elif msg.upper() == 'ROE-MOS-DIVIDEND':
             while True:
                 try:
@@ -1000,9 +1088,20 @@ if __name__ == "__main__":
                     ...
             if dividend == 999999:
                 continue
+            while True:
+                try:
+                    holding_time = int(input(f'>>>> 请输入持有时间({HOLDING_TIME}, 999999重新选择策略) <<<< '))
+                    if holding_time in HOLDING_TIME or holding_time == 999999:
+                        break
+                except:
+                    ...
+            if holding_time == 999999:  # 双点退出
+                continue
             print('正在执行ROE-MOS-DIVIDEND选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range, dividend=dividend)
+            res = stockbacktest.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(
+                roe_list=roe_list, mos_range=mos_range, dividend=dividend, holding_time=holding_time
+                )
         elif msg.upper() == 'ROE-MOS-MULTI-YIELD':
             while True:
                 try:
@@ -1037,9 +1136,20 @@ if __name__ == "__main__":
                     ...
             if multi_value == 999999:
                 continue
+            while True:
+                try:
+                    holding_time = int(input(f'>>>> 请输入持有时间({HOLDING_TIME}, 999999重新选择策略) <<<< '))
+                    if holding_time in HOLDING_TIME or holding_time == 999999:
+                        break
+                except:
+                    ...
+            if holding_time == 999999:  # 双点退出
+                continue
             print('正在执行ROE-MOS-MULTI-YIELD选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(roe_list=roe_list, mos_range=mos_range, multi_value=multi_value)
+            res = stockbacktest.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(
+                roe_list=roe_list, mos_range=mos_range, multi_value=multi_value, holding_time=holding_time
+                )
         elif msg.upper() == 'QUIT':
             break
         else:
@@ -1052,8 +1162,8 @@ if __name__ == "__main__":
             for item in value:
                 print(item)
                 stock_codes.append(item[0][0:6])
-            start_date = str(int(key[1:5])+1)+'-06-01'
-            end_date = str(int(key[1:5])+2)+'-06-01'
+            start_date = key.split(':')[1]
+            end_date = key.split(':')[2]
             res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
             print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
             res = utils.calculate_index_rising_value('000300', start_date, end_date)
