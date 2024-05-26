@@ -10,7 +10,10 @@ from typing import List, Dict, Union
 import utils
 import tsswindustry as sw
 from path import (INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, 
-                STRATEGIES, MOS_STEP, HOLDING_TIME, FIRST_TRADE_DATE)
+                STRATEGIES, MOS_STEP, HOLDING_TIME, FIRST_TRADE_DATE, MAX_NUMBERS)
+
+pd.set_option('display.colheader_justify', 'left')
+pd.set_option('display.max_colwidth', 20)
 
 class Strategy:
     def __init__(self):
@@ -145,10 +148,17 @@ class Strategy:
             res = self.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(**condition)
         for key, value in sorted(res.items(), key=lambda x: x[0]):
             print(key, '投资组合', f'共{len(value)}', '只股票')
-            stock_codes = []
-            for item in value:
-                print(item)
-                stock_codes.append(item[0][0:6])
+            start_end = key.split(':')[0]  # 选股时间段
+            start_year = int(start_end.split('-')[0][1:5])  # 选股起始年份
+            end_year = int(start_end.split('-')[1][1:5])  # 选股结束年份
+            columns = list(range(start_year, end_year-1, -1))
+            columns = [f"Y{item}" for item in columns]
+            columns = ["股票代码", "股票名称", "申万行业"] + columns
+            df = pd.DataFrame(value, columns=columns)
+            if not df.empty:
+                print(df)
+            stock_codes = df['股票代码'].tolist()
+            stock_codes = [item[0:6] for item in stock_codes]
             start_date = key.split(":")[1]
             end_date = key.split(":")[2]
             res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
@@ -162,14 +172,14 @@ class Strategy:
         strategy: str, 
         result: Dict, 
         index_list: List = ['000300', '399006', '000905'], 
-        max_nembers: int = 15
+        max_numbers: int = MAX_NUMBERS
     ) -> Union[str, Dict]:
         """
         对选股策略的测试结果进行初步测试,生成该测试结果每个时间组股票组合的收益率和指定指数的收益率,即测试结果和指数的收益对比.
         :param strategy:选股策略名称,目前支持'ROE','PE-PB','ROE-DIVIDEND','ROE-MOS', 'ROE-MOS-DIVIDEND'.
         :param result:策略类方法的返回值,即测试条件相对应的测试结果.
         :param index_list:指定测试的指数,默认为沪深300(000300),创业板指(399006),中证500(000905),最多为3个指数.
-        :param max_nembers:时间组最大平均选股数量,默认为15.
+        :param max_numbers:时间组最大平均选股数量,默认为15.
         :return:返回值为字典,键为时间组(和result参数时间组相同),值为该时间组的选股组合和指定指数的收益率.
         NOTE:
         quant-stock系统速度慢,相比win-stock而言,主打测试较小的组合.
@@ -181,7 +191,7 @@ class Strategy:
             raise ValueError('请检查指数代码是否正确')
         test_result = {date: [] for date in result.keys()}  # 定义返回值
 
-        if sum([len(item) for item in result.values()])/len(result) > max_nembers:
+        if sum([len(item) for item in result.values()])/len(result) > max_numbers:
             # print('测试结果股票数量过多,为减轻计算压力,返回定制的结果')
             return {date: [0, 0] for date in result.keys()}
         
@@ -561,22 +571,29 @@ class Strategy:
                     condition=condition, display=False, 
                     sqlite_file=dest_sqlite3, table_name=dest_table
                 )
-    #############################################################################################
-    # 以下是选股策略的具体实现。让我们想象一下，沿着数据库的数据库的时间字段序列滑动，每次一年，以7年为一个时间组。
-    # 依次取出每个时间组Y2023-Y2017, Y2022-Y2016, Y2021-Y2015, Y2020-Y2014......将时间组依次排列，把它
-    # 看成一列火车，每节车厢对应一个时间组。现在全部车厢都是空的，表示还没有选股。选股策略其实就是不同的过滤器或者
-    # 过滤的组合。
-    # 现在假设每个时间组的股票持有期为12个月（默认），现在加入最底层的过滤器ROE开始选股，每个车厢里都有了合适的股
-    # 票，然后再加个一个过滤器MOS，在此筛选后，得到了合适的股票。依次类推，还可以加个第三个过滤器股息率，再筛选一次。
-    # 现在假设持股期限为6个月，重新筛选一次。
-    # 同样首先在每节车厢里加入底层过滤器ROE，得到筛选结果。然后将每节车厢一分为2(12/6)，每个部分的长度为6个月，每个
-    # 部分里面的股票都是一样的。然后在每个部分再加入第二个过滤器MOS，得到筛选结果。再加入第三个过滤器股息率，得到筛选
-    # 结果。
-    # 现在假设持股期限为3个月，重新筛选一次。
-    # 同样首先在每节车厢里加入底层过滤器ROE，得到筛选结果。然后将每节车厢一分为4(12/3)，分割后的长度为3个月，每个部
-    # 分里面的股票都是一样的。然后在每个部分再加入第二个过滤器MOS，得到筛选结果。再加入第三个过滤器股息率，得到筛选结
-    # 果。这个比喻可能不是很好，希望可以帮助记忆和理解。（2024-05-23）
-    ##############################################################################################
+    ###################################################################################################
+    # 用生产线比喻quant-stock系统的测试过程。以ROE-MOS-DIVIDEND测试流程为例。
+    # 流水线传送带上一只空箱子缓慢移动,到了目标点停下,等待合适的产品(投资组合)装进来。
+    # 生产线如何从原材料(数据库)中生产出产品呢(投资组合)？很简单,就是使用查询动作,找到数据库中Y2023-Y2017年每年ROE均大于
+    # 目标值的记录即可。如果箱子里只有一个格子,查询到的记录放入箱子即可,如何箱子里有多个格子,每个格子里都要放入同样的查询结果。
+    # 为什么有的时候箱子只有一个格子,有的时候箱子有多个格子呢?格子多少和投资组合的持有时间有关。投资组合持有时间默认为12个
+    # 月,对应整个箱子。默认状态下,一个箱子只有一个格子,代表12个月份。如果将投资组合持有时间调整为6个月,那么整个车厢就有两
+    # 个格子(12除以6),每个格子代表6个月,全部格子的持有时间和箱子的持有时间12个月相等。如果投资组合持有时间调整为4个月,那
+    # 么整个车厢里面就有三个格子(12除以4),每个格子代表4个月,全部格子的持有时间和箱子的持有时间12个月相等。
+    # 为什么初步查询后,每个格子里面要放入同样的查询结果呢?在ROE-MOD-DIVIDEND策略中,第一道查询过滤器为7年ROE均大于目标值,
+    # 在使用年度ROE为原材料的情况下,查询的结果在未来的12个月是不会发生变化的,所以车厢内(覆盖12个月)全部格子里面初步查询后的
+    # 投资组合都是一样的。如果我们只使用ROE策略来选股,那么每个格子(持股期间)的投资组合都是一样的,只不过每一个新的持股期开始
+    # 时,需要将上期的投资组合调整成等资金权重。
+    # 经过ROE过滤器筛选后,车厢每个格子(持股期间)里面都有了同样的投资组合,第二道过滤器MOS上场了。针对每一个格子,生产线会计算
+    # 该格子(持股期间)起点时刻投资组合所有股票的MOS值,根据MOS的目标值过滤出符合条件的股票。
+    # 经过MOS过滤器过滤后,每个格子里面的投资组合包含的股票就出现了差异。第三道过滤器DIVIDEND出场了。针对每一个格子,生产线会
+    # 查询该格子(持股期间)起点时刻投资组合所有股票的DIVIDEND值,根据DIVIDEND的目标值过滤出符合条件的股票。
+    # 到了这里,第一个车厢里面全部格子都放入了符合生产条件(三道过滤器)的投资组合了。在实际投资的时候,需要在每个格子(持股期间)
+    # 起点时刻将该格子里面的投资组合调整成等资金权重模式。
+    # 然后生产线继续缓慢移动,第二个空箱子出来了。生产线启动第一道ROE过滤器,查询Y2022-Y2016年每年ROE均大于目标值的记录,放入
+    # 箱子的全部格子里。然后开始MOS过滤器、DIVIDEND过滤器过滤筛选。
+    # 依次循环,直到原材料(数据库)时间轴走到尽头即可终止。
+    ###################################################################################################
     @staticmethod
     def ROE_only_strategy_backtest_from_1991(
         roe_list:List=[20]*5, roe_value=None, period:int=5, holding_time:int=12
@@ -1159,10 +1176,17 @@ if __name__ == "__main__":
         # 显示细节
         for key, value in sorted(res.items(), key=lambda x: x[0]):
             print(key, '投资组合', f'共{len(value)}', '只股票')
-            stock_codes = []
-            for item in value:
-                print(item)
-                stock_codes.append(item[0][0:6])
+            start_end = key.split(':')[0]  # 选股时间段
+            start_year = int(start_end.split('-')[0][1:5])  # 选股起始年份
+            end_year = int(start_end.split('-')[1][1:5])  # 选股结束年份
+            columns = list(range(start_year, end_year-1, -1))
+            columns = [f"Y{item}" for item in columns]
+            columns = ["股票代码", "股票名称", "申万行业"] + columns
+            df = pd.DataFrame(value, columns=columns)
+            if not df.empty:
+                print(df)
+            stock_codes = df['股票代码'].tolist()
+            stock_codes = [item[0:6] for item in stock_codes]
             start_date = key.split(':')[1]
             end_date = key.split(':')[2]
             res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
