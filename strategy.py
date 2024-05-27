@@ -9,8 +9,8 @@ import numpy as np
 from typing import List, Dict, Union
 import utils
 import tsswindustry as sw
-from path import (INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, 
-                STRATEGIES, MOS_STEP, HOLDING_TIME, FIRST_TRADE_DATE, MAX_NUMBERS)
+from path import (INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, STRATEGIES, 
+                MOS_STEP, HOLDING_TIME, FIRST_TRADE_DATE, MAX_NUMBERS, ROE_LIST, MOS_RANGE, DV_LIST)
 
 pd.set_option('display.colheader_justify', 'left')
 pd.set_option('display.max_colwidth', 20)
@@ -40,7 +40,7 @@ class Strategy:
         condition = []  # 定义返回值
         if strategy.upper() == 'ROE':
             for item in range(items):
-                roe_value = random.randint(10, 40)
+                roe_value = random.randint(*ROE_LIST)
                 period = random.randint(5, 10)
                 tmp =  {
                     'strategy': strategy.upper(), 
@@ -54,8 +54,8 @@ class Strategy:
                 condition.append(tmp)
         elif strategy.upper() == 'ROE-MOS':
             for item in range(items):
-                roe_value = random.randint(10, 40)
-                mos_range = [round(random.uniform(-1, 1), 4) for _ in range(2)]
+                roe_value = random.randint(*ROE_LIST)
+                mos_range = [round(random.uniform(*MOS_RANGE), 4) for _ in range(2)]
                 mos_range.sort()
                 if mos_range[1] - mos_range[0] > mos_step:
                     mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
@@ -70,10 +70,10 @@ class Strategy:
                 condition.append(tmp)
         elif strategy.upper() == 'ROE-DIVIDEND':
             for item in range(items):
-                roe_value = random.randint(10, 40)
+                roe_value = random.randint(*ROE_LIST)
                 period = random.randint(5, 10)
                 roe_list = [roe_value]*period
-                dividend = random.randint(0, 10)
+                dividend = random.randint(*DV_LIST)
                 tmp =  {
                     'strategy': strategy.upper(),
                     'test_condition': {
@@ -86,12 +86,12 @@ class Strategy:
                 condition.append(tmp)
         elif strategy.upper() == 'ROE-MOS-DIVIDEND':
             for item in range(items):
-                roe_value = random.randint(10, 40)
-                mos_range = [round(random.uniform(-1, 1), 4) for _ in range(2)]
+                roe_value = random.randint(*ROE_LIST)
+                mos_range = [round(random.uniform(*MOS_RANGE), 4) for _ in range(2)]
                 mos_range.sort()
                 if mos_range[1] - mos_range[0] > mos_step:
                     mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
-                dividend = random.randint(0, 10)
+                dividend = random.randint(*DV_LIST)
                 tmp =  {
                     'strategy': strategy.upper(),
                     'test_condition': {
@@ -105,8 +105,8 @@ class Strategy:
         elif strategy.upper() == "ROE-MOS-MULTI-YIELD":
             # 该策略和ROE-MOS-DIVIDEND策略类似,只是用每个交易日10年国债利率的倍数替代固定股息率.
             for item in range(items):
-                roe_value = random.randint(10, 40)
-                mos_range = [round(random.uniform(-1, 1), 4) for _ in range(2)]
+                roe_value = random.randint(*ROE_LIST)
+                mos_range = [round(random.uniform(*MOS_RANGE), 4) for _ in range(2)]
                 mos_range.sort()
                 if mos_range[1] - mos_range[0] > mos_step:
                     mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
@@ -652,7 +652,7 @@ class Strategy:
                     time_tail = "-" + FIRST_TRADE_DATE[0] + "-" + FIRST_TRADE_DATE[1]  # -06-01
                     first_trade_date = str(int(columns[index][1:5])+1) + time_tail
                     res = [item for item in res if sw.in_index_or_not(item[0][:6], first_trade_date)]
-                    # 根据持有时间切分“车厢”, 将res赋值给每个“车厢”
+                    # 根据持有时间切分“箱子”, 将res赋值给每个“格子”
                     parts = 12 / holding_time
                     first_key = f"""{columns[index]}-{columns[index+period-1]}:"""  # 时间组键名第一部分
                     end_trade_date = str(int(columns[index][1:5])+2) + time_tail

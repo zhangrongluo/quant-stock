@@ -518,8 +518,6 @@ if __name__ == '__main__':
             break
         elif msg.upper() == 'CREATE-TRADE-CSV':
             print('正在创建trade-record csv文件,请稍等...\r', end='', flush=True)
-            # for stock in stocks:
-            #     create_trade_record_csv_table(stock)
             create_all_stocks_trade_record_csv_table()  # 使用线程池经常会中断,原因未知
             print('trade-record csv文件创建成功.'+ ' '*50)
         elif msg.upper() == 'CREATE-CURVE':
@@ -536,8 +534,8 @@ if __name__ == '__main__':
             print('indicators表格创建成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-TRADE-CSV':
             print('正在更新trade-record csv文件,请稍等...\r', end='', flush=True)
-            for stock in stocks:
-                update_trade_record_csv(stock)
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                executor.map(data.update_trade_record_csv, codes)
             print('trade-record csv文件更新成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-CURVE':
             print('正在更新curve表格,请稍等...\r', end='', flush=True)

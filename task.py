@@ -54,8 +54,8 @@ def check_integrity():
 def update_trade_record_csv():
     with semaphore:
         print('开始更新trade record csv文件\r', end='', flush=True)
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            executor.map(data.update_trade_record_csv, codes)
+        for code in codes:
+            data.update_trade_record_csv(code)
         print('更新trade record csv文件完成.' + ' '*20, flush=True)
 
 # 每日下午6点30分开始更新一次curve.sqlite3
