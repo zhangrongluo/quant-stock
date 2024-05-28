@@ -43,6 +43,6 @@ MOS_STEP = 0.25  # MOS步长
 HOLDING_TIME = [6, 12]  # 每个时间组持有时间
 FIRST_TRADE_DATE = ["06", "01"]  # 每个时间组的第一个交易日
 MAX_NUMBERS = 15  # 每个时间组最大持仓数量
-ROE_LIST = [4, 24]  # ROE范围
+ROE_LIST = [8, 24]  # ROE范围
 MOS_RANGE = [-1, 1]  # MOS范围
 DV_LIST = [0, 10]  # 股息率范围

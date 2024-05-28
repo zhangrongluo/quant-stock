@@ -28,7 +28,7 @@ thread = threading.Thread(target=auto_test)
 codes = [item[0][0:6] for item in sw.get_all_stocks()]
 
 # 每日上午6点开始检查文件和数据完整性
-@scheduler.scheduled_job('cron', hour=6, minute=0)
+@scheduler.scheduled_job('cron', hour=6, minute=0, misfire_grace_time=600)
 def check_integrity():
     with semaphore:
         res = data.check_stockcodes_integrity()
@@ -49,8 +49,8 @@ def check_integrity():
                     pool.map(create_trade_record_csv_table, codes)
             print("TRADE_RECORD_PATH目录中缺失的交易信息文件已补齐."+" "*50)
 
-# 每日下午6点30分开始更新一次trade record csv文件
-@scheduler.scheduled_job('cron', hour=18, minute=30)
+# 每日下午6点40分开始更新一次trade record csv文件
+@scheduler.scheduled_job('cron', hour=18, minute=40, misfire_grace_time=600)
 def update_trade_record_csv():
     with semaphore:
         print('开始更新trade record csv文件\r', end='', flush=True)
@@ -59,7 +59,7 @@ def update_trade_record_csv():
         print('更新trade record csv文件完成.' + ' '*20, flush=True)
 
 # 每日下午6点30分开始更新一次curve.sqlite3
-@scheduler.scheduled_job('cron', hour=18, minute=30)
+@scheduler.scheduled_job('cron', hour=18, minute=30, misfire_grace_time=600)
 def update_curve_sqlite3():
     with semaphore:
         print('开始更新curve.sqlite3\r', end='', flush=True)
@@ -67,7 +67,7 @@ def update_curve_sqlite3():
         print('更新curve.sqlite3完成.' + ' '*20, flush=True)
 
 # 每日下午6点30分开始更新一次index_value.sqlite3
-@scheduler.scheduled_job('cron', hour=18, minute=30)
+@scheduler.scheduled_job('cron', hour=18, minute=30, misfire_grace_time=600)
 def update_index_value_sqlite3():
     with semaphore:
         print('开始更新index_value.sqlite3\r', end='', flush=True)
@@ -77,7 +77,7 @@ def update_index_value_sqlite3():
 
 # 每周五下午6点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
 # 然后推送到gitee main分支. 本地仓库路径IMAC_REPOSITORY_PATH
-@scheduler.scheduled_job('cron',  hour=18, minute=30)
+@scheduler.scheduled_job('cron',  hour=18, minute=35, misfire_grace_time=600)
 def copy_test_condition_sqlite3():
     from path import ROOT_PATH
     with semaphore:
@@ -95,7 +95,7 @@ def copy_test_condition_sqlite3():
 # dest中的table_name+“from-win"表中.
 src = "/Users/zhangrongluo/Desktop/win-stock/tmp-file/test-condition.sqlite3"
 dest = "/Users/zhangrongluo/Desktop/quant-stock/test-condition/test-condition.sqlite3"
-@scheduler.scheduled_job('cron', day=25, hour=18, minute=0)
+@scheduler.scheduled_job('cron', day=25, hour=18, minute=0, misfire_grace_time=600)
 def copy_condition_table():
     with semaphore:
         print('开始复制test-condition.sqlite3\r', end='', flush=True)
@@ -112,7 +112,7 @@ def copy_condition_table():
             print(f"表{table_name}复制完成.")
             
 # 每年5月1日上午0点0分1秒更新indicator-roe-from-1991.sqlite3
-@scheduler.scheduled_job('cron', month=5, day=1, hour=0, minute=0, second=1)
+@scheduler.scheduled_job('cron', month=5, day=1, hour=0, minute=0, second=1, misfire_grace_time=600)
 def update_indicator_roe_from_1991():
     with semaphore:
         print('开始更新indicator-roe-from-1991.sqlite3\r', end='', flush=True)
