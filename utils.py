@@ -146,8 +146,15 @@ def calculate_index_rising_value(code: str, start_date: str, end_date: str) -> f
     if date_regex.match(end_date):
         end_date = end_date.replace('-', '')
     full_code = f'{code}.SH' if code.startswith('000') else f'{code}.SZ'
-    pro = ts.pro_api()
-    df = pro.index_daily(ts_code=full_code, start_date=start_date, end_date=end_date)
+    if not os.path.exists(INDEX_VALUE):
+        data.create_index_indicator_table(code)
+    con = sqlite3.connect(INDEX_VALUE)
+    with con:
+        sql = f"""
+            SELECT trade_date, pct_chg FROM '{full_code}' WHERE 
+            trade_date>=? AND trade_date<=?
+        """
+        df = pd.read_sql(sql, con, params=(start_date, end_date))
     if df is None or df.empty:
         rate = 0.00
     else:

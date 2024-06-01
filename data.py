@@ -225,7 +225,7 @@ def create_index_indicator_table(index: str='000300'):
     NOTE:
     数据期间从20040101开始至今日(tushare接口限制)
     数据库名称为INDEX_VALUE,表名为000300.SH, 000905.SH, 399006.SH
-    指标包括ts_code,trade_date,pb,pe,turnover_rate,pe_ttm,turnover_rate_f
+    指标包括ts_code,trade_date,pb,pe,turnover_rate,pe_ttm,turnover_rate_f和pct_chg
     NOTE:
     此外再加一个roe预估数=pb/pe
     """
@@ -252,7 +252,8 @@ def create_index_indicator_table(index: str='000300'):
             pe_ttm REAL DEFAULT 0,
             turnover_rate REAL DEFAULT 0,
             turnover_rate_f REAL DEFAULT 0,
-            roe_est REAL DEFAULT 0
+            roe_est REAL DEFAULT 0,
+            pct_chg REAL DEFAULT 0
         )"""
         con.executescript(sql)  # 创建表格
 
@@ -263,11 +264,18 @@ def create_index_indicator_table(index: str='000300'):
             df = pro.index_dailybasic(ts_code=full_code, 
             start_date=part_date_list[-1], end_date=part_date_list[0], 
             fields='ts_code,trade_date,pb,pe,pe_ttm,turnover_rate,turnover_rate_f')
-            df.drop_duplicates(subset=['trade_date'], keep='last', inplace=True)
             try:
                 df['roe_est'] = (df['pb'] / df['pe']).apply(lambda x: round(x, 4))  # 保留四位小数
             except ZeroDivisionError:
                 df['roe_est'] = 0.0000
+            # 下载pct_chg列合并到df中,并按照trade_date降序排列
+            df_chg = pro.index_daily(ts_code=full_code, start_date=part_date_list[-1], 
+            end_date=part_date_list[0], fields="trade_date, pct_chg")
+            df = df.set_index('trade_date')
+            df_chg = df_chg.set_index('trade_date')
+            df = df.join(df_chg, how='inner')
+            df.reset_index(inplace=True)
+            df.drop_duplicates(subset=['trade_date'], keep='last', inplace=True)
             df.to_sql(name=full_code, con=con, index=False, if_exists='append')
 
 def create_trade_record_csv_table(code: str, rm_empty_rows: bool = False) -> None:

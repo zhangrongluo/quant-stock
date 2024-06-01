@@ -646,8 +646,6 @@ class Strategy:
                         else:
                             sql += f"""{year}>=? and """
                     res = con.execute(sql, tuple(roe_list)).fetchall()
-                    # 检查res股票清单是否在申万行业分类取票sw_codes中
-                    res = [item for item in res if item[0] in sw_codes]
                     # 检查res股票清单是否在sw行业指数中
                     time_tail = "-" + FIRST_TRADE_DATE[0] + "-" + FIRST_TRADE_DATE[1]  # -06-01
                     first_trade_date = str(int(columns[index][1:5])+1) + time_tail
