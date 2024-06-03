@@ -180,7 +180,7 @@ def calculate_stock_rising_value(code: str, start_date: str, end_date: str) -> f
     csv_file = os.path.join(TRADE_RECORD_PATH, swindustry, f"{code}.csv")
     if not os.path.exists(csv_file):
         data.create_trade_record_csv_table(code)
-    df = pd.read_csv(csv_file, dtype={'trade_date': str, "trade_date": str})
+    df = pd.read_csv(csv_file, dtype={'trade_date': str}, usecols=['trade_date', 'pct_chg'])
     df = df[(df['trade_date'] >= start_date)]
     df = df[(df['trade_date'] <= end_date)]
     if df is None or df.empty:
@@ -205,6 +205,27 @@ def calculate_portfolio_rising_value(code_list: List[str], start_date: str, end_
         tmp = calculate_stock_rising_value(code, start_date, end_date)
         rate += tmp
     return rate/len(code_list)
+
+def date_to_stamp(date: str) -> int:
+    """
+    把yyyy-mm-dd格式的日期转换为13位时间戳
+    :param date: 日期, 例如: '2022-01-01'
+    :return: 13位时间戳
+    """
+    begin = date + " 00:00:00"
+    timeArray = time.strptime(begin, "%Y-%m-%d %H:%M:%S")
+    stamp = int(time.mktime(timeArray) * 1000)
+    return stamp
+
+def stamp_to_date(stamp: int) -> str:
+    """
+    把13位时间戳转换为yyyy-mm-dd格式的日期
+    :param stamp: 13位时间戳
+    :return: 日期, 例如: '2022-01-01'
+    """
+    timeArray = time.localtime(stamp // 1000)
+    date = time.strftime("%Y-%m-%d", timeArray)
+    return date
 
 def find_closest_row_in_trade_record(code: str, date: str):
     """
@@ -250,11 +271,11 @@ def get_indicator_in_trade_record(code: str, date: str, fields: str) -> float:
     获取指定股票指定日期的指定字段值
     :param code: 股票代码, 例如: '600000' or '000001'
     :param date: 日期, 例如: '2019-01-01'
-    :param fileds: 字段名称, 可选范围为: ['pe_ttm', 'pb', 'ps_ttm', 'dv_ttm', 'total_mv', 'circ_mv']
+    :param fileds: 字段名称, 可选范围为: ['pe_ttm', 'pb', 'ps_ttm', 'dv_ttm', 'total_mv', 'circ_mv', 'dv_est']
     :return: 指定字段的值
     """
-    if fields not in ['pe_ttm', 'pb', 'ps_ttm', 'dv_ttm', 'total_mv', 'circ_mv']:
-        raise ValueError('参数fields应为pe_ttm, pb, ps_ttm, dv_ttm, total_mv, circ_mv之一')
+    if fields not in ['pe_ttm', 'pb', 'ps_ttm', 'dv_ttm', 'total_mv', 'circ_mv', 'dv_est']:
+        raise ValueError('参数fields应在pe_ttm, pb, ps_ttm, dv_ttm, total_mv, circ_mv, dv_est中')
     row = find_closest_row_in_trade_record(code, date)
     return row[fields].values[0]
 

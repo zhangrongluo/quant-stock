@@ -154,6 +154,22 @@ class Strategy:
             columns = list(range(start_year, end_year-1, -1))
             columns = [f"Y{item}" for item in columns]
             columns = ["股票代码", "股票名称", "申万行业"] + columns
+            if msg.upper() == "ROE-DIVIDEND":
+                columns.append("DV_ts")
+                columns.append("DV_xq")
+            elif msg.upper() == "ROE-MOS":
+                columns.append("MOS7")
+            elif msg.upper() == "ROE-MOS-DIVIDEND":
+                columns.append("MOS7")
+                columns.append("DV_ts")
+                columns.append("DV_xq")
+            elif msg.upper() == "ROE-MOS-MULTI-YIELD":
+                columns.append("MOS7")
+                columns.append("DV_ts")
+                columns.append("DV_xq")
+                columns.append("M_Yield")
+            else:
+                pass
             df = pd.DataFrame(value, columns=columns)
             if not df.empty:
                 print(df)
@@ -702,7 +718,9 @@ class Strategy:
             tmp_stocks = []  # 保存筛选结果
             for stock in stocks: 
                 tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
-                if tmp_dividend >= dividend:
+                xq_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_est')
+                if xq_dividend >= dividend:  # 采用dv_est替代tushare的dv_ttm
+                    stock = stock + (tmp_dividend, xq_dividend)
                     tmp_stocks.append(stock)
             result[date] = tmp_stocks
         return result
@@ -737,6 +755,7 @@ class Strategy:
             for stock in stocks:
                 mos_7 = utils.calculate_MOS_7_from_2006(code=stock[0][0:6], date=tmp_date)
                 if mos_range[1] >= mos_7 >= mos_range[0]:
+                    stock = stock + (mos_7,)
                     tmp_stocks.append(stock)
             result[date] = tmp_stocks
         return result
@@ -770,7 +789,9 @@ class Strategy:
             tmp_stocks = []
             for stock in stocks:
                 tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
-                if tmp_dividend >= dividend:
+                xq_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_est')
+                if xq_dividend >= dividend:  # 采用dv_est替代tushare的dv_ttm
+                    stock = stock + (tmp_dividend, xq_dividend)
                     tmp_stocks.append(stock)
             result[date] = tmp_stocks
         return result
@@ -805,7 +826,9 @@ class Strategy:
             tmp_stocks = []
             for stock in stocks:
                 tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], trade_date, 'dv_ttm')
-                if tmp_dividend >= multi_yield:
+                xq_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], trade_date, 'dv_est')
+                if xq_dividend >= multi_yield:  # 采用dv_est替代tushare的dv_ttm
+                    stock = stock + (tmp_dividend, xq_dividend, multi_yield)
                     tmp_stocks.append(stock)
             result[date] = tmp_stocks
         return result
@@ -1180,6 +1203,22 @@ if __name__ == "__main__":
             columns = list(range(start_year, end_year-1, -1))
             columns = [f"Y{item}" for item in columns]
             columns = ["股票代码", "股票名称", "申万行业"] + columns
+            if msg.upper() == "ROE-DIVIDEND":
+                columns.append("DV_ts")
+                columns.append("DV_xq")
+            elif msg.upper() == "ROE-MOS":
+                columns.append("MOS7")
+            elif msg.upper() == "ROE-MOS-DIVIDEND":
+                columns.append("MOS7")
+                columns.append("DV_ts")
+                columns.append("DV_xq")
+            elif msg.upper() == "ROE-MOS-MULTI-YIELD":
+                columns.append("MOS7")
+                columns.append("DV_ts")
+                columns.append("DV_xq")
+                columns.append("M_Yield")
+            else:
+                pass
             df = pd.DataFrame(value, columns=columns)
             if not df.empty:
                 print(df)

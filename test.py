@@ -67,9 +67,10 @@ def auto_test():
             if now.tm_mon in [1, 2, 3, 4]:
                 # 设置当年的flag值为No
                 sql = f"""
-                    INSERT OR IGNORE INTO flag (year, flag) VALUES ('{time.localtime().tm_year}', 'No')
+                    INSERT OR IGNORE INTO flag (year, flag) VALUES (?, ?)
                 """
-                con.execute(sql)
+                params = (time.localtime().tm_year, 'No')
+                con.execute(sql, params)
             else:  # now.tm_mon in [5, 6, 7, 8, 9, 10, 11, 12]:
                 sql = f"""
                     CREATE TABLE IF NOT EXISTS '{table_name}'
