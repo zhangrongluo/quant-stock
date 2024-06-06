@@ -46,3 +46,4 @@ MAX_NUMBERS = 15  # 每个时间组最大持仓数量
 ROE_LIST = [8, 24]  # ROE范围
 MOS_RANGE = [-1, 1]  # MOS范围
 DV_LIST = [0, 10]  # 股息率范围
+COVER_YEARS = 1  # 重新测试时向前覆盖年数

@@ -50,12 +50,14 @@ def check_integrity():
             print("TRADE_RECORD_PATH目录中缺失的交易信息文件已补齐."+" "*50)
 
 # 每日下午6点40分开始更新一次trade record csv文件
-@scheduler.scheduled_job('cron', hour=18, minute=40, misfire_grace_time=600)
+@scheduler.scheduled_job('cron', hour=20, minute=0, misfire_grace_time=3600)
 def update_trade_record_csv():
     with semaphore:
         print('开始更新trade record csv文件\r', end='', flush=True)
-        for code in codes:
-            data.update_trade_record_csv(code)
+        # for code in codes:
+        #     data.update_trade_record_csv(code)
+        with ThreadPoolExecutor() as executor:
+            executor.map(data.update_trade_record_csv, codes)
         print('更新trade record csv文件完成.' + ' '*20, flush=True)
 
 # 每日下午6点30分开始更新一次curve.sqlite3

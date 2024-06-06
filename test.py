@@ -2,7 +2,7 @@ import time
 import pandas as pd
 import sqlite3
 from strategy import Strategy
-from path import TEST_CONDITION_SQLITE3
+from path import TEST_CONDITION_SQLITE3, COVER_YEARS
 import threading
 import json
 
@@ -12,26 +12,61 @@ lock = threading.Lock()
 # 每年的1-4月生成的测试条件保存在上年的表中,比如2023年1-4月生成的测试条件保存在condition-2022表中.
 # 每年的5-12月生成的测试条件保存在当年的表中,比如2023年5-12月生成的测试条件保存在condition-2023表中.
 
-def has_test_previous_year() -> bool:
-    """
-    判断是否已经重新测试过以前年度的测试条件.
-    在test-condition.sqlite3数据库中设置一个flag表格,保存是否已经测试过以前年度的测试条件.
-    该表格有两个字段:year,flag. year字段保存年份(格式为2023),flag字段保存是否已经测试过以前年度的测试条件.
-    如果flag字段为Yes,则表示已经测试过以前年度的测试条件,否则为No.
-    :return: True or False
+def create_retested_progress_table(cover_years: int=COVER_YEARS) -> None:
+    """ 
+    创建进度表格,记录TEST_CONDITION_SQLITE3中以前年度测试条件的测试进度.
+    用于保存测试条件的测试进度,表格名为progress.
+    :param cover_years: 向前覆盖的年数,默认为1
+    表格字段包括: table_name, total_rows, retested_rows, involved_years.
     """
     con = sqlite3.connect(TEST_CONDITION_SQLITE3)
     with con:
-        # 获取当年的flag值
-        sql = f"""
-            SELECT flag FROM flag WHERE year='{time.localtime().tm_year}'
+        sql = """
+            CREATE TABLE IF NOT EXISTS progress
+            (
+                table_name TEXT,
+                total_rows INTEGER,
+                retested_rows INTEGER,
+                involved_years TEXT,
+                PRIMARY KEY(table_name, involved_years)
+            )
         """
-        res = con.execute(sql).fetchone()
+        con.execute(sql)
+        tables = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table"', con)
+        tables = [table for table in tables['name'] if table.startswith('condition')]
+        this_year = time.localtime().tm_year
+        cover_table = [str(year) for year in range(this_year-cover_years, this_year)]
+        tables = [table for table in tables if table.split('-')[1] in cover_table]
+        for table in tables:
+            # 获取表格中的总行数
+            sql = f"""
+                SELECT COUNT(*) FROM '{table}'
+            """
+            total_rows = con.execute(sql).fetchone()[0]
+            sql = f"""
+                INSERT OR IGNORE INTO progress 
+                (table_name, total_rows, retested_rows, involved_years) 
+                VALUES (?, ?, ?, ?)
+            """
+            params = (table, total_rows, 0, f"{this_year}")
+            con.execute(sql, params)
 
-        if res is None:
-            return False
-        else:
-            return True if res[0] == 'Yes' else False
+def get_restested_progress_detail(cover_years: int=COVER_YEARS) -> dict:
+    """
+    读取progress覆盖年度的测试条件完成进度
+    :param cover_years: 向前覆盖的年数,默认为COVER_YEARS
+    :return: dict, key为表格名, value为total_rows\retested_rows\involved_years
+    """
+    con = sqlite3.connect(TEST_CONDITION_SQLITE3)
+    with con:
+        sql = f""" SELECT * FROM progress """
+        df = pd.read_sql(sql, con)
+        this_year = time.localtime().tm_year
+        cover_table = [f"condition-{year}" for year in range(this_year-cover_years, this_year)]
+        df = df[df['table_name'].str.contains('|'.join(cover_table))]  # 选择覆盖年度的表格
+        df = df[df['involved_years'] == f"{this_year}"]  # 选择本年度的测试条件
+        result = df.set_index('table_name').to_dict(orient='index')
+    return result
 
 def auto_test():
     """
@@ -43,19 +78,6 @@ def auto_test():
     在建立年度表格CONDITION_TABLE前,最好暂停该函数.等年度ROE表、交易记录文件
     国债收益率文件以及其他相关文件都更新以后,再启动该函数.
     """
-    now = time.localtime()
-    table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
-    con = sqlite3.connect(TEST_CONDITION_SQLITE3)
-    with con:
-        sql = """
-            CREATE TABLE IF NOT EXISTS flag
-            (
-                year TEXT,
-                flag TEXT,
-                PRIMARY KEY(year)
-            )
-        """
-        con.execute(sql)    
     case = Strategy()
     while True:
         # 动态获取年度表格名,必须要重新定义,否则会出现表格名不更新的情况
@@ -65,13 +87,8 @@ def auto_test():
         con = sqlite3.connect(TEST_CONDITION_SQLITE3)
         with con:
             if now.tm_mon in [1, 2, 3, 4]:
-                # 设置当年的flag值为No
-                sql = f"""
-                    INSERT OR IGNORE INTO flag (year, flag) VALUES (?, ?)
-                """
-                params = (time.localtime().tm_year, 'No')
-                con.execute(sql, params)
-            else:  # now.tm_mon in [5, 6, 7, 8, 9, 10, 11, 12]:
+                pass
+            if now.tm_mon in [5, 6, 7, 8, 9, 10, 11, 12]:
                 sql = f"""
                     CREATE TABLE IF NOT EXISTS '{table_name}'
                     (
@@ -91,20 +108,26 @@ def auto_test():
                 """
                 con.execute(sql)
                 # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数
-                if has_test_previous_year() is False:
-                    # 获取以前年度表格的表名(不包含当年的表)
-                    df = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table"', con)
-                    all_table_names = df['name'].tolist()
-                    prev_table_names = [
-                        table for table in all_table_names if str(now.tm_year) not in table and table != 'flag'
-                    ]
-                    for prev_table in prev_table_names:
+                create_retested_progress_table()
+                result = get_restested_progress_detail()
+                prev_table_names = list(result.keys())
+                for table, progress in result.items():
+                    if progress['retested_rows'] < progress['total_rows'] \
+                        and progress['involved_years'] == f"{now.tm_year}":
+                        print(f"开始重新测试{table}表格中的测试条件.")
                         case.retest_conditions_from_sqlite3(
                             src_sqlite3=TEST_CONDITION_SQLITE3, 
-                            src_table=prev_table, 
+                            src_table=table, 
                             dest_sqlite3=TEST_CONDITION_SQLITE3, 
-                            dest_table=table_name
+                            dest_table=table_name,
+                            from_pos=progress['retested_rows']
                         )
+                        # 更新进度表格中的retested_rows字段 TODO: 需要实时更新
+                        sql = f"""
+                            UPDATE progress SET retested_rows=? WHERE table_name=?
+                        """
+                        params = (progress['total_rows'], table)
+                        con.execute(sql, params)
                     # 获取table_name表格中的测试条件,遍历prev_table_names,对相同的测试条件,
                     # 则将table_name表格中的date字段替换为prev_table表格中的date字段
                     # 保留全部入选测试条件原始日期
@@ -126,11 +149,6 @@ def auto_test():
                                 params = (condition["strategy"], json.dumps(condition["test_condition"]))
                                 con.execute(sql, params)
                                 break
-                    # 更新当年的flag值为Yes
-                    sql = f"""
-                        UPDATE flag SET flag='Yes' WHERE year='{time.localtime().tm_year}'
-                    """
-                    con.execute(sql)
         # 第二步 随机测试新生成的测试条件
         with lock:
             try:

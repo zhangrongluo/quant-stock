@@ -565,6 +565,7 @@ class Strategy:
         src_table: str,
         dest_sqlite3: str,
         dest_table: str,
+        from_pos: int = 0
     ):
         """
         从指定的sqlite3数据库中获取测试条件集,重新测试后保存至指定的数据库.
@@ -572,12 +573,13 @@ class Strategy:
         :param src_table: 指定的sqlite3数据库中的表名
         :param dest_sqlite3: 保存测试结果的sqlite3数据库文件
         :param dest_table: 保存测试结果的sqlite3数据库中的表名
+        :param from_pos: 从指定的位置开始获取测试条件
         :return: None
         """
         conditions = self.get_conditions_from_sqlite3(
             src_sqlite3=src_sqlite3, src_table=src_table
         )
-        for condition in conditions:  # 重新测试
+        for condition in conditions[from_pos:]:  # 重新测试
             tmp_conditons = self.get_conditions_from_sqlite3(
                 src_sqlite3=dest_sqlite3, src_table=dest_table
             )
