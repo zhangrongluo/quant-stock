@@ -12,14 +12,14 @@ lock = threading.Lock()
 # 每年的1-4月生成的测试条件保存在上年的表中,比如2023年1-4月生成的测试条件保存在condition-2022表中.
 # 每年的5-12月生成的测试条件保存在当年的表中,比如2023年5-12月生成的测试条件保存在condition-2023表中.
 
-def create_retested_progress_table(cover_years: int=COVER_YEARS) -> None:
+def create_retested_progress_table(con, cover_years: int=COVER_YEARS) -> None:
     """ 
     创建进度表格,记录TEST_CONDITION_SQLITE3中以前年度测试条件的测试进度.
     用于保存测试条件的测试进度,表格名为progress.
+    :param con: sqlite3.connect()对象
     :param cover_years: 向前覆盖的年数,默认为1
     表格字段包括: table_name, total_rows, retested_rows, involved_years.
     """
-    con = sqlite3.connect(TEST_CONDITION_SQLITE3)
     with con:
         sql = """
             CREATE TABLE IF NOT EXISTS progress
@@ -32,6 +32,7 @@ def create_retested_progress_table(cover_years: int=COVER_YEARS) -> None:
             )
         """
         con.execute(sql)
+        con.commit()
         tables = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table"', con)
         tables = [table for table in tables['name'] if table.startswith('condition')]
         this_year = time.localtime().tm_year
@@ -50,14 +51,15 @@ def create_retested_progress_table(cover_years: int=COVER_YEARS) -> None:
             """
             params = (table, total_rows, 0, f"{this_year}")
             con.execute(sql, params)
+            con.commit()
 
-def get_restested_progress_detail(cover_years: int=COVER_YEARS) -> dict:
+def get_restested_progress_detail(con, cover_years: int=COVER_YEARS) -> dict:
     """
     读取progress覆盖年度的测试条件完成进度
     :param cover_years: 向前覆盖的年数,默认为COVER_YEARS
+    :param con: sqlite3.connect()对象
     :return: dict, key为表格名, value为total_rows\retested_rows\involved_years
     """
-    con = sqlite3.connect(TEST_CONDITION_SQLITE3)
     with con:
         sql = f""" SELECT * FROM progress """
         df = pd.read_sql(sql, con)
@@ -108,8 +110,8 @@ def auto_test():
                 """
                 con.execute(sql)
                 # 从以前年度表格中获取测试条件集合,执行retest_conditions_from_sqlite3函数
-                create_retested_progress_table()
-                result = get_restested_progress_detail()
+                create_retested_progress_table(con=con)
+                result = get_restested_progress_detail(con=con)
                 prev_table_names = list(result.keys())
                 for table, progress in result.items():
                     if progress['retested_rows'] < progress['total_rows'] \
@@ -128,6 +130,7 @@ def auto_test():
                         """
                         params = (progress['total_rows'], table)
                         con.execute(sql, params)
+                        con.commit()
                     # 获取table_name表格中的测试条件,遍历prev_table_names,对相同的测试条件,
                     # 则将table_name表格中的date字段替换为prev_table表格中的date字段
                     # 保留全部入选测试条件原始日期
