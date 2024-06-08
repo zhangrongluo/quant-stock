@@ -364,6 +364,7 @@ class Strategy:
                 )
             """
             conn.execute(sql)
+            conn.commit()
             print('已保存测试条件到数据库!')
 
     @staticmethod
