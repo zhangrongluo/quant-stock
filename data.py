@@ -565,7 +565,7 @@ def update_ROE_indicators_table_from_1991(code: str):
             con.execute(sql, (last_roe, full_code))
         except sqlite3.IntegrityError:
             ...
-    print(f"{full_code}最新ROE数据更新成功." + " "*20 + '\r', end='', flush=True)
+    print(f"{full_code} {last_filed} ROE数据更新成功." + " "*20 + '\r', end='', flush=True)
 
 def update_trade_record_csv(code: str):
     """

@@ -2,7 +2,7 @@ import time
 import pandas as pd
 import sqlite3
 from strategy import Strategy
-from path import TEST_CONDITION_SQLITE3, COVER_YEARS
+from path import TEST_CONDITION_SQLITE3, COVER_YEARS, NEW_TABLE_MONTH
 import threading
 import json
 
@@ -34,11 +34,10 @@ def create_retested_progress_table(con, cover_years: int=COVER_YEARS) -> None:
         """
         con.execute(sql)
         con.commit()
-
         tables = pd.read_sql('SELECT name FROM sqlite_master WHERE type="table"', con)
         tables = [table for table in tables['name'] if table.startswith('condition')]
         this_year = time.localtime().tm_year
-        cover_table = [str(year) for year in range(this_year-COVER_YEARS, this_year)]
+        cover_table = [str(year) for year in range(this_year-cover_years, this_year)]
         tables = [table for table in tables if table.split('-')[1] in cover_table]
         for table in tables:
             # 获取表格中的总行数
@@ -80,13 +79,11 @@ def retest_previous_years_conditions(cover_years: int=COVER_YEARS) -> None:
     """
     global case
     now = time.localtime()
-    table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
+    table_name = f'condition-{now.tm_year}' if now.tm_mon >= NEW_TABLE_MONTH else f'condition-{now.tm_year-1}'
     # 第一步 重新检测以前年度的全部测试条件
     con = sqlite3.connect(TEST_CONDITION_SQLITE3)
     with con:
-        if now.tm_mon in [1, 2, 3, 4]:
-            pass
-        if now.tm_mon in [5, 6, 7, 8, 9, 10, 11, 12]:
+        if now.tm_mon >= NEW_TABLE_MONTH:
             sql = f"""
                 CREATE TABLE IF NOT EXISTS '{table_name}'
                 (
@@ -174,7 +171,8 @@ def auto_test():
             # 第二步 随机测试新生成的测试条件
             try:
                 now = time.localtime()
-                table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
+                table_name = f'condition-{now.tm_year}' if now.tm_mon >= NEW_TABLE_MONTH \
+                     else f'condition-{now.tm_year-1}'
                 case.test_strategy_random_condition(
                     sqlite_file=TEST_CONDITION_SQLITE3, 
                     table_name=table_name

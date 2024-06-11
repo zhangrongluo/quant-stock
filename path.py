@@ -33,6 +33,7 @@ SW_INDUSTRY_DF = pd.read_excel(SW_INDUSTRY_XLS, usecols=['股票代码', '公司
 # 数据库表名
 ROE_TABLE = "indicators"  # indicator-roe-from-1991.sqlite3中的表
 CURVE_TABLE = "curve"  # curve.sqlite3中的表
+NEW_TABLE_MONTH = 5  # 新年度表格生成月份
 
 # iMac本地仓库路径
 IMAC_REPOSITORY_PATH = "/Users/zhangrongluo/Desktop/pythonzone/win-stock-conditions/win-stock-conditions"
@@ -41,8 +42,8 @@ IMAC_REPOSITORY_PATH = "/Users/zhangrongluo/Desktop/pythonzone/win-stock-conditi
 STRATEGIES = ['ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']
 MOS_STEP = 0.25  # MOS步长
 HOLDING_TIME = [6, 12]  # 每个时间组持有时间
-FIRST_TRADE_DATE = ["06", "01"]  # 每个时间组的第一个交易日
-MAX_NUMBERS = 15  # 每个时间组最大持仓数量
+FIRST_TRADE_DATE = ["06", "01"]  # 每个时间组的第一个交易日, 月份和日期, 月份要大于等于5
+MAX_NUMBERS = 15  # 全部时间组最大平均股票数量
 ROE_LIST = [8, 24]  # ROE范围
 MOS_RANGE = [-1, 1]  # MOS范围
 DV_LIST = [0, 10]  # 股息率范围
