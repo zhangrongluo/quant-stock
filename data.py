@@ -76,7 +76,6 @@ def add_dv_est_column_to_trade_record(trade_df: pd.DataFrame) -> pd.DataFrame:
     """
     为trade_df添加dv_est列,验证dv_ttm列,计算方法如下:
     :param trade_df: pd.DataFrame, 股票历史交易记录文件
-    :param code: str, 股票代码, 例如: '600000' or '000001'
     :return: pd.DataFrame, 添加dv_est列的股票历史交易记录文件
     """
     trade_df['dv'] = 0.00
@@ -271,9 +270,10 @@ def check_stockcodes_integrity(
     :param roe_table: str, ROE_TABLE表名
     :return: Dict,返回缺失的股票和文件代码信息
     NOTE:
-    返回一个字典,包含二个键值对:
+    返回一个字典,包含三个键值对:
     1. trade_record_path: {"农林牧渔":[...],...}, 表示每个行业目录下缺失的股票代码,
-    2. roe_table: [...], 表示roe_table数据表中缺失的股票代码.
+    2. roe_table: [...], 表示roe_table数据表中不存在而申万行业中存在的股票代码,需要添加.
+    3. to_remove: [...], 表示roe_table数据表中存在而申万行业中不存在的股票代码,需要删除.
     """
     result = {}  # 返回结果
     result['trade_record_path'] = {}
@@ -301,6 +301,7 @@ def check_stockcodes_integrity(
         roe_codes = df['stockcode'].values.tolist()
         roe_codes = [code[0:6] for code in roe_codes]  # 不含后缀的全部股票代码
     result['roe_table'] = [code for code in sw_codes if code not in roe_codes]
+    result['to_remove'] = [code for code in roe_codes if code not in sw_codes]
     return result
 
 def create_curve_value_table(days: int):
@@ -725,5 +726,16 @@ if __name__ == '__main__':
                     with ThreadPoolExecutor() as pool:
                         pool.map(create_trade_record_csv_table, codes)
                 print("TRADE_RECORD_PATH目录中缺失的交易信息文件已补齐."+" "*50)
+            if res["to_remove"]:
+                print("indicator_roe_from_1991.sqlite3文件中多余的股票代码:")
+                print(res["to_remove"])
+                print("开始删除ROE_TABLE中非申万行业的股票清单...")
+                con = sqlite3.connect(INDICATOR_ROE_FROM_1991)
+                with con:
+                    for code in res["to_remove"]:
+                        code = code + '.SH' if code.startswith('6') else code + '.SZ'
+                        sql = f""" DELETE FROM '{ROE_TABLE}' WHERE stockcode=? """
+                        con.execute(sql, (code,))
+                print("ROE_TABLE中多余的股票代码已删除."+" "*50)
         else:
             continue

@@ -18,7 +18,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import tsswindustry as sw
 import data
 from test import auto_test
-from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH
+from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH, INDICATOR_ROE_FROM_1991, ROE_TABLE
 import threading
 import platform
 
@@ -48,8 +48,19 @@ def check_integrity():
                 with ThreadPoolExecutor() as pool:
                     pool.map(create_trade_record_csv_table, codes)
             print("TRADE_RECORD_PATH目录中缺失的交易信息文件已补齐."+" "*50)
+        if res["to_remove"]:
+            print("indicator_roe_from_1991.sqlite3文件中多余的股票代码:")
+            print(res["to_remove"])
+            print("开始删除ROE_TABLE中非申万行业的股票清单...")
+            con = sqlite3.connect(INDICATOR_ROE_FROM_1991)
+            with con:
+                for code in res["to_remove"]:
+                    code = code + '.SH' if code.startswith('6') else code + '.SZ'
+                    sql = f""" DELETE FROM '{ROE_TABLE}' WHERE stockcode=? """
+                    con.execute(sql, (code,))
+            print("ROE_TABLE中多余的股票代码已删除."+" "*50)
 
-# 每日下午6点40分开始更新一次trade record csv文件
+# 每日下午8点0分开始更新一次trade record csv文件
 @scheduler.scheduled_job('cron', hour=20, minute=0, misfire_grace_time=3600)
 def update_trade_record_csv():
     with semaphore:
