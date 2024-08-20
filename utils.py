@@ -11,7 +11,7 @@ import tushare as ts
 import data
 import tsswindustry as sw
 from path import (INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, CURVE_TABLE, 
-                ROE_TABLE, TRADE_RECORD_PATH, INDEX_VALUE)
+                ROE_TABLE, TRADE_RECORD_PATH, INDEX_VALUE, STOCK_MOS_IMG, INDEX_MOS_IMG)
 
 def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     """
@@ -314,7 +314,7 @@ def draw_10y_yield_curve_figure():
     fig.set_size_inches(16, 10)
     plt.show()
 
-def save_whole_MOS_7_figure(code: str, dest: str, show_figure: bool = False):
+def save_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: bool = False):
     """ 
     绘制完整的MOS_7图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
@@ -383,7 +383,7 @@ def save_whole_MOS_7_figure(code: str, dest: str, show_figure: bool = False):
     if show_figure:
         plt.show()
 
-def save_whole_index_MOS_figure(index: str, dest: str, show_figure: bool = False):
+def save_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figure: bool = False):
     """ 
     绘制完整的MOS图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,

@@ -8,6 +8,8 @@ TRADE_RECORD_PATH = os.path.join(ROOT_PATH, "trade-record")  # 股票历史交�
 DATA_PACKAGE_PATH = os.path.join(ROOT_PATH, "data-package")  # 数据包保存目录
 SQL_PATH = os.path.join(ROOT_PATH, "sql")  # SQL文件保存目录
 TEST_CONDITION_PATH = os.path.join(ROOT_PATH, "test-condition")  # 测试条件保存目录
+STOCK_MOS_IMG = os.path.join(ROOT_PATH, "stock-mos-img")  # 股票MOS图保存目录
+INDEX_MOS_IMG = os.path.join(ROOT_PATH, "index-mos-img")  # 指数MOS图保存目录
 
 if not os.path.exists(DATA_PACKAGE_PATH):
     os.mkdir(DATA_PACKAGE_PATH)
@@ -17,6 +19,10 @@ if not os.path.exists(TRADE_RECORD_PATH):
     os.mkdir(TRADE_RECORD_PATH)
 if not os.path.exists(TEST_CONDITION_PATH):
     os.mkdir(TEST_CONDITION_PATH)
+if not os.path.exists(STOCK_MOS_IMG):
+    os.mkdir(STOCK_MOS_IMG)
+if not os.path.exists(INDEX_MOS_IMG):
+    os.mkdir(INDEX_MOS_IMG)
 
 # 内置文件
 SW_INDUSTRY_PATH = os.path.join(ROOT_PATH, "stock-list")
