@@ -61,7 +61,8 @@ def get_whole_trade_record_data(code: str) -> pd.DataFrame:
     result = result.set_index('trade_date')
     result = result.join(tmp, how='inner')
     result.reset_index(inplace=True)
-    result = add_dv_est_column_to_trade_record(trade_df=result)
+    # result = add_dv_est_column_to_trade_record(trade_df=result)  # 被xueqiu拦截了
+    result['dv_est'] = 0.00
     return result
 
 ######################################################################################
@@ -77,6 +78,8 @@ def add_dv_est_column_to_trade_record(trade_df: pd.DataFrame) -> pd.DataFrame:
     为trade_df添加dv_est列,验证dv_ttm列,计算方法如下:
     :param trade_df: pd.DataFrame, 股票历史交易记录文件
     :return: pd.DataFrame, 添加dv_est列的股票历史交易记录文件
+    NOTE:
+    被雪球拦截了,无法获取分红数据,不再使用
     """
     trade_df['dv'] = 0.00
     code = trade_df['ts_code'].unique()[0][0:6]
@@ -172,42 +175,44 @@ def get_history_BOUNS_from_xueqiu(code: str) -> pd.DataFrame:
     :return: DataFrame, 报告期、分红方案、登记日、除权日、派息日、每股转股、送股数、派息金额
     NOTE:
     雪球上的分红方案已经格式化了,基本格式为10转5送5派3(实施方案)
+    被雪球拦截了,无法获取分红数据,不再使用
     """
-    url = "https://stock.xueqiu.com/v5/stock/f10/cn/bonus.json"
-    full_code = f"SH{code}" if code.startswith('6') else f"SZ{code}"
-    params = {
-        "symbol": f"{full_code}",
-        "size": "500",  # 足够大覆盖全周期即可
-        "page": "1",
-        "extend": "true"
-    }
-    headers = {
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.62',
-    }
-    session = requests.Session()
-    session.get(url='https://xueqiu.com/', headers=headers)
-    response = session.get(url=url, headers=headers, params=params).json()  # 获取数据
-    tmp = response["data"]["items"]
-    df = pd.DataFrame(tmp)
-    try:
-        # 保留plan_explain列中有”实施方案“文字的行
-        df = df[df['plan_explain'].str.contains('实施方案')]
-        df = df[['dividend_year', 'plan_explain', 'equity_date', 'ex_dividend_date']]
-        # 删除空行
-        df.dropna()
-        # 转化成日期格式
-        df['equity_date'] = df['equity_date'].apply(
-            lambda x: time.strftime('%Y%m%d', time.localtime(x/1000)))
-        df['ex_dividend_date'] = df['ex_dividend_date'].apply(
-            lambda x: time.strftime('%Y%m%d', time.localtime(x/1000)))
-        df.columns = ['报告期', '分红方案', '登记日', '除权日']
-        # 解析分红方案列，增加每股转股数 送股数 派息金额
-        df["每股转送"] = df["分红方案"].apply(
-            lambda x: get_detail_of_bouns_plan(x)["转股"] + get_detail_of_bouns_plan(x)["送股"])
-        df["每股派息"] = df["分红方案"].apply(lambda x: get_detail_of_bouns_plan(x)["派息"])
-        return df
-    except Exception as e:
-        return pd.DataFrame([])
+    return pd.DataFrame([]) 
+    # url = "https://stock.xueqiu.com/v5/stock/f10/cn/bonus.json"
+    # full_code = f"SH{code}" if code.startswith('6') else f"SZ{code}"
+    # params = {
+    #     "symbol": f"{full_code}",
+    #     "size": "500",  # 足够大覆盖全周期即可
+    #     "page": "1",
+    #     "extend": "true"
+    # }
+    # headers = {
+    #     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.62',
+    # }
+    # session = requests.Session()
+    # try:
+    #     session.get(url='https://xueqiu.com/', headers=headers)
+    #     response = session.get(url=url, headers=headers, params=params).json()  # 获取数据  id被xueqiu拦截了
+    #     tmp = response["data"]["items"]
+    #     df = pd.DataFrame(tmp)
+    #     # 保留plan_explain列中有”实施方案“文字的行
+    #     df = df[df['plan_explain'].str.contains('实施方案')]
+    #     df = df[['dividend_year', 'plan_explain', 'equity_date', 'ex_dividend_date']]
+    #     # 删除空行
+    #     df.dropna()
+    #     # 转化成日期格式
+    #     df['equity_date'] = df['equity_date'].apply(
+    #         lambda x: time.strftime('%Y%m%d', time.localtime(x/1000)))
+    #     df['ex_dividend_date'] = df['ex_dividend_date'].apply(
+    #         lambda x: time.strftime('%Y%m%d', time.localtime(x/1000)))
+    #     df.columns = ['报告期', '分红方案', '登记日', '除权日']
+    #     # 解析分红方案列，增加每股转股数 送股数 派息金额
+    #     df["每股转送"] = df["分红方案"].apply(
+    #         lambda x: get_detail_of_bouns_plan(x)["转股"] + get_detail_of_bouns_plan(x)["送股"])
+    #     df["每股派息"] = df["分红方案"].apply(lambda x: get_detail_of_bouns_plan(x)["派息"])
+    #     return df
+    # except Exception as e:
+    #     return pd.DataFrame([])
 
 def get_detail_of_bouns_plan(plan: str):
     """
@@ -451,18 +456,7 @@ def create_ROE_indicators_table_from_1991(code: str):
     NOTE: 
     被注释的第一行为使用Tushare接口的代码,速度仅为Xueqiu接口20%
     """
-    # roe_dict = get_ROE_indicators_from_Tushare(code=code)  # 使用tushare接口
-    start_year = '19911231'
-    end_year = str(time.localtime().tm_year-1)+'1231'
-    count = int(end_year[0:4]) - 1991 + 1
-    roe_dict = get_ROE_indicators_from_xueqiu(code=code, count=count, type='Q4')
-    periods = pd.date_range(start=start_year, end=end_year, freq='y').strftime("%Y%年报")  # 补齐缺失的年度
-    for period in periods:
-        if period not in roe_dict.keys():
-            roe_dict[period] = None
-    for key in list(roe_dict.keys()):  # 删除1991以前的键值对
-        if int(key[0:4]) < 1991:
-            del roe_dict[key]
+    roe_dict = get_ROE_indicators_from_Tushare(code=code)  # 使用tushare接口
     roe_dict = dict(sorted(roe_dict.items(), key=lambda x: x[0], reverse=True))  # 按照键降序排序
     con = sqlite3.connect(INDICATOR_ROE_FROM_1991)
     with con:
@@ -602,7 +596,8 @@ def update_trade_record_csv(code: str):
     if df1.empty:
         print(f"{full_code}无可更新数据." + ' '*20 + '\r', end='', flush=True)
         return  # 如果df1为空,则无可更新数据,直接返回
-    df1 = add_dv_est_column_to_trade_record(trade_df=df1)  # 添加股息率列
+    # df1 = add_dv_est_column_to_trade_record(trade_df=df1)  # 添加股息率列 # 被xueqiu拦截了
+    df1['dv_est'] = 0.00
     tmp = sw.get_name_and_class_by_code(code=code)  # 插入公司简称和行业分类
     df1.insert(2, 'company', tmp[0])
     df1.insert(3, 'industry', tmp[1])

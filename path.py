@@ -47,8 +47,8 @@ IMAC_REPOSITORY_PATH = "/Users/zhangrongluo/Desktop/pythonzone/win-stock-conditi
 # 策略参数
 STRATEGIES = ['ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']
 MOS_STEP = 0.25  # MOS步长
-HOLDING_TIME = [6, 12]  # 每个时间组持有时间
-FIRST_TRADE_DATE = ["06", "01"]  # 每个时间组的第一个交易日, 月份和日期, 月份要大于等于5
+TRADE_MONTH = list(range(5, 13))  # 交易月份
+HOLDING_TIME = [4, 6, 12]  # 每个时间组持有时间(月)
 MAX_NUMBERS = 15  # 全部时间组最大平均股票数量
 ROE_LIST = [8, 24]  # ROE范围
 MOS_RANGE = [-1, 1]  # MOS范围

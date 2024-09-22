@@ -374,6 +374,9 @@ def save_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: b
     
     if not os.path.exists(dest):
         os.mkdir(dest)
+    existed_files = [file for file in os.listdir(dest) if file.startswith(code)]
+    for file in existed_files:
+        os.remove(os.path.join(dest, file))
     s = start_date.replace('-', '')
     e = end_date.replace('-', '')
     file_name = f"{code}-{s}-{e}.png"
@@ -435,6 +438,9 @@ def save_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figu
 
     if not os.path.exists(dest):
         os.mkdir(dest)
+    existed_files = [file for file in os.listdir(dest) if file.startswith(index)]
+    for file in existed_files:
+        os.remove(os.path.join(dest, file))
     s = start.replace('-', '')
     e = end.replace('-', '')
     file_name = f"{index}-{s}-{e}.png"
