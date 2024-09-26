@@ -1030,9 +1030,19 @@ if __name__ == "__main__":
                     ...
             if trade_month == 999999:  # 双点退出
                 continue
+            condition =  {
+                'strategy': 'ROE', 
+                'test_condition': {
+                    'roe_list': [],  
+                    'roe_value': roe_value,
+                    'period': period,
+                    'holding_time': holding_time,
+                    'trade_month': trade_month
+                }
+            }
             print('正在执行ROE选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_only_strategy_backtest_from_1991(
+            tmp_res = stockbacktest.ROE_only_strategy_backtest_from_1991(
                 roe_list=roe_list, period=period, holding_time=holding_time, trade_month=trade_month
                 )
         elif msg.upper() == 'ROE-DIVIDEND':
@@ -1081,9 +1091,19 @@ if __name__ == "__main__":
                     ...
             if trade_month == 999999:  # 双点退出
                 continue
+            condition =  {
+                'strategy': 'ROE-DIVIDEND',
+                'test_condition': {
+                    'roe_list': roe_list,
+                    'period': period,
+                    'dividend': dividend,
+                    'holding_time': holding_time,
+                    'trade_month': trade_month,
+                }
+            }
             print('正在执行ROE-DIVIDEND选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_DIVIDEND_strategy_backtest_from_1991(
+            tmp_res = stockbacktest.ROE_DIVIDEND_strategy_backtest_from_1991(
                 roe_list=roe_list, period=period, dividend=dividend, holding_time=holding_time, trade_month=trade_month
                 )
         elif msg.upper() == 'ROE-MOS':
@@ -1129,9 +1149,18 @@ if __name__ == "__main__":
                     ...
             if trade_month == 999999:  # 双点退出
                 continue
+            condition =  {
+                'strategy': 'ROE-MOS', 
+                'test_condition': {
+                    'roe_list': [roe_value]*7, 
+                    'mos_range': mos_range,
+                    'holding_time': holding_time,
+                    'trade_month': trade_month
+                }
+            }
             print('正在执行ROE-MOS选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_MOS_strategy_backtest_from_1991(
+            tmp_res = stockbacktest.ROE_MOS_strategy_backtest_from_1991(
                 roe_list=roe_list, mos_range=mos_range, holding_time=holding_time, trade_month=trade_month
                 )
         elif msg.upper() == 'ROE-MOS-DIVIDEND':
@@ -1186,9 +1215,19 @@ if __name__ == "__main__":
                     ...
             if trade_month == 999999:  # 双点退出
                 continue
+            condition =  {
+                'strategy': 'ROE-MOS-DIVIDEND',
+                'test_condition': {
+                    'roe_list': [roe_value]*7,
+                    'mos_range': mos_range,
+                    'dividend': dividend,
+                    'holding_time': holding_time,
+                    'trade_month': trade_month
+                }
+            }
             print('正在执行ROE-MOS-DIVIDEND选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(
+            tmp_res = stockbacktest.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(
                 roe_list=roe_list, mos_range=mos_range, dividend=dividend, holding_time=holding_time, trade_month=trade_month
                 )
         elif msg.upper() == 'ROE-MOS-MULTI-YIELD':
@@ -1243,9 +1282,19 @@ if __name__ == "__main__":
                     ...
             if trade_month == 999999:  # 双点退出
                 continue
+            condition =  {
+                'strategy': 'ROE-MOS-MULTI-YIELD',
+                'test_condition': {
+                    'roe_list': [roe_value]*7,
+                    'mos_range': mos_range,
+                    'multi_value': multi_value,
+                    'holding_time': holding_time,
+                    'trade_month': trade_month
+                }
+            }
             print('正在执行ROE-MOS-MULTI-YIELD选股策略,请稍等......')
             print('++'*50)
-            res = stockbacktest.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(
+            tmp_res = stockbacktest.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(
                 roe_list=roe_list, mos_range=mos_range, multi_value=multi_value, holding_time=holding_time, trade_month=trade_month
                 )
         elif msg.upper() == 'QUIT':
@@ -1254,7 +1303,7 @@ if __name__ == "__main__":
             continue
 
         # 显示细节
-        for key, value in sorted(res.items(), key=lambda x: x[0]):
+        for key, value in sorted(tmp_res.items(), key=lambda x: x[0]):
             print(key, '投资组合', f'共{len(value)}', '只股票')
             start_end = key.split(':')[0]  # 选股时间段
             start_year = int(start_end.split('-')[0][1:5])  # 选股起始年份
@@ -1290,4 +1339,19 @@ if __name__ == "__main__":
             res = utils.calculate_index_rising_value('000300', start_date, end_date)
             print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
             print('--'*50)
-
+        
+        strategy = condition['strategy']
+        if strategy in STRATEGIES:
+            portfolio_test_result = stockbacktest.test_strategy_portfolio(
+                strategy=strategy, result=tmp_res, index_list=['000300']
+            )
+            evaluate_result = stockbacktest.evaluate_portfolio_effect(
+                test_condition=condition, 
+                test_result=tmp_res, 
+                portfolio_test_result=portfolio_test_result
+            )
+            print("策略评估结果如下:")
+            print(f"{'basic_ratio:':<20} {evaluate_result['basic_ratio']:.2%}")
+            print(f"{'inner_rate:':<20} {evaluate_result['inner_rate']:.2%}")
+            print(f"{'down_max:':<20} {evaluate_result['down_max']:.2%}")
+            print('++'*50)
