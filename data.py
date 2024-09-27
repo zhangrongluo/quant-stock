@@ -49,9 +49,10 @@ def get_whole_trade_record_data(code: str) -> pd.DataFrame:
     """
     full_code = code + '.SH' if code.startswith('6') else code + '.SZ'
     pro = ts.pro_api()
-    result = pro.daily_basic(
-        ts_code=full_code,
-        fields='ts_code,trade_date,close,pe_ttm,pb,ps_ttm,dv_ttm,total_mv,circ_mv')
+    fields = ["ts_code", "trade_date", "close", "pe_ttm", "pb", "ps_ttm",
+        "dv_ratio", "dv_ttm", "turnover_rate", "turnover_rate_f", "volume_ratio",
+        "total_share", "float_share", "free_share", "total_mv", "circ_mv", "pe", "ps"]
+    result = pro.daily_basic(ts_code=full_code, fields=fields)
     tmp = sw.get_name_and_class_by_code(code=code)  # 插入公司简称和行业分类
     result.insert(2, 'company', tmp[0])
     result.insert(3, 'industry', tmp[1])
@@ -61,59 +62,7 @@ def get_whole_trade_record_data(code: str) -> pd.DataFrame:
     result = result.set_index('trade_date')
     result = result.join(tmp, how='inner')
     result.reset_index(inplace=True)
-    # result = add_dv_est_column_to_trade_record(trade_df=result)  # 被xueqiu拦截了
-    result['dv_est'] = 0.00
     return result
-
-######################################################################################
-# 新增一列dv_est,验证dv_ttm列,计算方法如下:
-# 下载历史分红数据dataframe,取出某年度比如2020年度分红数据(包括年度中报和季报分红数据),根据送转股和
-# 派息金额计算每股派息额,填充到dv_est列中,填充的范围为每期分红除权日至下期分红除权日之前一日.如果下期
-# 没有分红,则填充至本期分红方案中最迟除权日的365天后.一年中有多次分红方案,需要分别计算并累计填充.
-# eg:2020年中期分红方案除权日为20201210日,年度分红方案除权日为20210624,如果2021年没有分红方案,则
-# 填充到20210624+365=20220624日.如果2021年有年度分红方案,除权日为20220513,则填充到20220512日.
-######################################################################################
-def add_dv_est_column_to_trade_record(trade_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    为trade_df添加dv_est列,验证dv_ttm列,计算方法如下:
-    :param trade_df: pd.DataFrame, 股票历史交易记录文件
-    :return: pd.DataFrame, 添加dv_est列的股票历史交易记录文件
-    NOTE:
-    被雪球拦截了,无法获取分红数据,不再使用
-    """
-    trade_df['dv'] = 0.00
-    code = trade_df['ts_code'].unique()[0][0:6]
-    df = get_history_BOUNS_from_xueqiu(code=code)
-    if not df.empty:
-        reports = df["报告期"].tolist()
-        pattern = re.compile(r"(\d{4})")  # 匹配年份
-        reports = [pattern.search(report).group() for report in reports if pattern.search(report) is not None]
-        reports = sorted(list(set(reports)))  # 全部分红年份
-        dv_plans = []  # 存储每年的分红方案
-        for report in reports:
-            tmp = df.loc[df["报告期"].str.contains(report)]
-            dv_plans.append(tmp)
-        for report, dv_plan in zip(reports, dv_plans):
-            lastest_day = dv_plan['除权日'].max()  # 本年度最迟除权日
-            for index, row in dv_plan.iterrows():
-                dv = row['每股派息']/(1+row['每股转送'])
-                start_date = row['除权日']
-                # 计算填充终止日期
-                next_report_year = str(int(report)+1)
-                if next_report_year in reports:  # 如果有下一年度分红方案,则填充至下一年度最早除权日之前
-                    next_dv_plan = dv_plans[reports.index(next_report_year)]
-                    end_date = next_dv_plan['除权日'].min()
-                else:  # 如果没有下一年度分红方案,则填充至本年度最迟除权日的365天后
-                    end_date = (
-                        datetime.datetime.strptime(lastest_day, "%Y%m%d") + datetime.timedelta(days=365)
-                        ).strftime("%Y%m%d")
-                # 填充dv列,填充范围为start_date至end_date之间，不包括end_date, dv要和行中现有的值累加
-                trade_df.loc[(trade_df['trade_date'] >= start_date) & (trade_df['trade_date'] < end_date), 'dv'] += dv
-        trade_df['dv_est'] = round(trade_df["dv"]/trade_df["close"]*100, 4)
-        del trade_df['dv']
-    else:
-        trade_df['dv_est'] = 0.00
-    return trade_df
 
 def get_ROE_indicators_from_Tushare(code: str) -> Dict:
     """
@@ -138,104 +87,6 @@ def get_ROE_indicators_from_Tushare(code: str) -> Dict:
             else:
                 result[period] = res.loc[0, 'roe']
     result = dict(sorted(result.items(), key=lambda x: x[0], reverse=True))  # 按照键降序排序
-    return result
-
-def get_ROE_indicators_from_xueqiu(code: str, count: int, type: str):
-    """
-    从雪球网站上获取的财务指标信息
-    :param code: 股票代码, 例如: 600600 或 000001
-    :param count: 财务指标的数量, 例如: 30
-    :param type: 财务指标类型Q1、Q2、Q3、Q4、all,分别代表第一二三四季度及全部期间
-    :return: 返回一个字典, 键为年度名称, 值为年度ROE值
-    """
-    url = 'https://stock.xueqiu.com/v5/stock/finance/cn/indicator.json'
-    params = {
-        'symbol': f'sh{code}' if code.startswith('6') else f'sz{code}',
-        'type': f'{type}',
-        'is_detail': 'true',
-        'count': f'{count}',
-        'timestamp': ''
-    }
-    headers = {
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.62',
-    }
-    session = requests.Session()
-    session.get(url='https://xueqiu.com/', headers=headers)
-    response = session.get(url=url, headers=headers, params=params).json()  # 获取数据
-
-    result = {}  # 定义返回值
-    for indicator in response['data']['list']:
-        result[indicator['report_name']] = indicator['avg_roe'][0]
-    return result
-
-def get_history_BOUNS_from_xueqiu(code: str) -> pd.DataFrame:
-    """ 
-    从雪球网获取沪深股票历史分红数据,用于计算股息率
-    :param code: 股票代码, 例如: '000001' or '000333'
-    :return: DataFrame, 报告期、分红方案、登记日、除权日、派息日、每股转股、送股数、派息金额
-    NOTE:
-    雪球上的分红方案已经格式化了,基本格式为10转5送5派3(实施方案)
-    被雪球拦截了,无法获取分红数据,不再使用
-    """
-    return pd.DataFrame([]) 
-    # url = "https://stock.xueqiu.com/v5/stock/f10/cn/bonus.json"
-    # full_code = f"SH{code}" if code.startswith('6') else f"SZ{code}"
-    # params = {
-    #     "symbol": f"{full_code}",
-    #     "size": "500",  # 足够大覆盖全周期即可
-    #     "page": "1",
-    #     "extend": "true"
-    # }
-    # headers = {
-    #     'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.62',
-    # }
-    # session = requests.Session()
-    # try:
-    #     session.get(url='https://xueqiu.com/', headers=headers)
-    #     response = session.get(url=url, headers=headers, params=params).json()  # 获取数据  id被xueqiu拦截了
-    #     tmp = response["data"]["items"]
-    #     df = pd.DataFrame(tmp)
-    #     # 保留plan_explain列中有”实施方案“文字的行
-    #     df = df[df['plan_explain'].str.contains('实施方案')]
-    #     df = df[['dividend_year', 'plan_explain', 'equity_date', 'ex_dividend_date']]
-    #     # 删除空行
-    #     df.dropna()
-    #     # 转化成日期格式
-    #     df['equity_date'] = df['equity_date'].apply(
-    #         lambda x: time.strftime('%Y%m%d', time.localtime(x/1000)))
-    #     df['ex_dividend_date'] = df['ex_dividend_date'].apply(
-    #         lambda x: time.strftime('%Y%m%d', time.localtime(x/1000)))
-    #     df.columns = ['报告期', '分红方案', '登记日', '除权日']
-    #     # 解析分红方案列，增加每股转股数 送股数 派息金额
-    #     df["每股转送"] = df["分红方案"].apply(
-    #         lambda x: get_detail_of_bouns_plan(x)["转股"] + get_detail_of_bouns_plan(x)["送股"])
-    #     df["每股派息"] = df["分红方案"].apply(lambda x: get_detail_of_bouns_plan(x)["派息"])
-    #     return df
-    # except Exception as e:
-    #     return pd.DataFrame([])
-
-def get_detail_of_bouns_plan(plan: str):
-    """
-    从沪深股票分红方案中提取详细信息
-    :param plan: 分红方案, 例如: '10转10转5派1.00元(含税)'
-    :return: 返回详细信息
-    NOTE:
-    沪深股票分红方案格式为: 10转10送10派1.00元,提取出转股送股和派息的数字
-    返回一个字典,包含转股,送股和派息的数字,除以基数10,转成每股数值,如果没有则为0.
-    """
-    # 提取转之后的数字
-    result = {}
-    p1 = re.compile(f"转(\d+\.?\d*)")
-    tmp = p1.findall(plan)
-    result['转股'] = round(float(tmp[0])/10, 2) if tmp else 0.00
-    # 提取送之后的数字
-    p2 = re.compile(f"送(\d+\.?\d*)")
-    tmp = p2.findall(plan)
-    result['送股'] = round(float(tmp[0])/10, 2) if tmp else 0.00
-    # 提取派之后的数字
-    p3 = re.compile(f"派(\d+\.?\d*)")
-    tmp = p3.findall(plan)
-    result['派息'] = round(float(tmp[0])/10, 2) if tmp else 0.00
     return result
 
 def get_yield_data_from_china_bond(date_str: str) -> float:
@@ -582,8 +433,10 @@ def update_trade_record_csv(code: str):
     # 获取数据
     full_code = code + '.SH' if code.startswith('6') else code + '.SZ'
     pro = ts.pro_api()
-    df1 = pro.daily_basic(ts_code=full_code, start_date=start_date, end_date=end_date, 
-    fields=["ts_code","trade_date","close","pe_ttm","pb","ps_ttm","circ_mv","dv_ttm","total_mv"])
+    fields = ["ts_code", "trade_date", "close", "pe_ttm", "pb", "ps_ttm",
+    "dv_ratio", "dv_ttm", "turnover_rate", "turnover_rate_f", "volume_ratio",
+    "total_share", "float_share", "free_share", "total_mv", "circ_mv", "pe", "ps"]
+    df1 = pro.daily_basic(ts_code=full_code, start_date=start_date, end_date=end_date, fields=fields)
     # 获取历史涨幅，以trade_date为索引，合并到df1中
     tmp = pro.daily(
         ts_code=full_code, start_date=start_date, end_date=end_date, 
@@ -596,8 +449,6 @@ def update_trade_record_csv(code: str):
     if df1.empty:
         print(f"{full_code}无可更新数据." + ' '*20 + '\r', end='', flush=True)
         return  # 如果df1为空,则无可更新数据,直接返回
-    # df1 = add_dv_est_column_to_trade_record(trade_df=df1)  # 添加股息率列 # 被xueqiu拦截了
-    df1['dv_est'] = 0.00
     tmp = sw.get_name_and_class_by_code(code=code)  # 插入公司简称和行业分类
     df1.insert(2, 'company', tmp[0])
     df1.insert(3, 'industry', tmp[1])
@@ -641,9 +492,12 @@ if __name__ == '__main__':
             break
         elif msg.upper() == 'CREATE-TRADE-CSV':
             print('正在创建trade-record csv文件,请稍等...\r', end='', flush=True)
-            # for code in stocks:
-            #     create_trade_record_csv_table(code)
-            create_all_stocks_trade_record_csv_table()  # 使用线程池经常会中断,原因未知
+            # create_all_stocks_trade_record_csv_table()  # 使用线程池经常会中断,原因未知
+            for index in range(0, len(stocks), 20):
+                codes = stocks[index:index+20]
+                with ThreadPoolExecutor() as pool:
+                    pool.map(create_trade_record_csv_table, codes)
+                time.sleep(1)
             print('trade-record csv文件创建成功.'+ ' '*50)
         elif msg.upper() == 'CREATE-CURVE':
             print('正在创建curve表格,请稍等...\r', end='', flush=True)
@@ -654,13 +508,19 @@ if __name__ == '__main__':
             print('curve表格创建成功.'+ ' '*50)
         elif msg.upper() == 'CREATE-ROE-TABLE':
             print('正在创建indicators表格,请稍等...\r', end='', flush=True)
-            with ThreadPoolExecutor() as pool:
-                pool.map(create_ROE_indicators_table_from_1991, stocks)
+            for index in range(0, len(stocks), 20):
+                codes = stocks[index:index+20]
+                with ThreadPoolExecutor() as pool:
+                    pool.map(create_ROE_indicators_table_from_1991, codes)
+                time.sleep(1)
             print('indicators表格创建成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-TRADE-CSV':
             print('正在更新trade-record csv文件,请稍等...\r', end='', flush=True)
-            with ThreadPoolExecutor() as pool:
-                pool.map(update_trade_record_csv, stocks)
+            for index in range(0, len(stocks), 20):
+                codes = stocks[index:index+20]
+                with ThreadPoolExecutor() as pool:
+                    pool.map(update_trade_record_csv, codes)
+                time.sleep(1)
             print('trade-record csv文件更新成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-CURVE':
             print('正在更新curve表格,请稍等...\r', end='', flush=True)

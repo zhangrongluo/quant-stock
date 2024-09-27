@@ -160,18 +160,18 @@ class Strategy:
             columns = [f"Y{item}" for item in columns]
             columns = ["股票代码", "股票名称", "申万行业"] + columns
             if msg.upper() == "ROE-DIVIDEND":
-                columns.append("DV_ts")
-                columns.append("DV_xq")
+                columns.append("DV_ttm")
+                columns.append("DV_ratio")
             elif msg.upper() == "ROE-MOS":
                 columns.append("MOS7")
             elif msg.upper() == "ROE-MOS-DIVIDEND":
                 columns.append("MOS7")
-                columns.append("DV_ts")
-                columns.append("DV_xq")
+                columns.append("DV_ttm")
+                columns.append("DV_ratio")
             elif msg.upper() == "ROE-MOS-MULTI-YIELD":
                 columns.append("MOS7")
-                columns.append("DV_ts")
-                columns.append("DV_xq")
+                columns.append("DV_ttm")
+                columns.append("DV_ratio")
                 columns.append("M_Yield")
             else:
                 pass
@@ -197,13 +197,12 @@ class Strategy:
     ) -> Union[str, Dict]:
         """
         对选股策略的测试结果进行初步测试,生成该测试结果每个时间组股票组合的收益率和指定指数的收益率,即测试结果和指数的收益对比.
-        :param strategy:选股策略名称,目前支持'ROE','PE-PB','ROE-DIVIDEND','ROE-MOS', 'ROE-MOS-DIVIDEND'.
+        :param strategy:选股策略名称,支持'ROE-DIVIDEND','ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD'.
         :param result:策略类方法的返回值,即测试条件相对应的测试结果.
         :param index_list:指定测试的指数,默认为沪深300(000300),创业板指(399006),中证500(000905),最多为3个指数.
         :param max_numbers:时间组最大平均选股数量,默认为15.
         :return:返回值为字典,键为时间组(和result参数时间组相同),值为该时间组的选股组合和指定指数的收益率.
         NOTE:
-        quant-stock系统速度慢,相比win-stock而言,主打测试较小的组合.
         如果result参数时间组平均持股数量大于15,直接返回定制的测试结果
         """
         if strategy.upper() not in STRATEGIES:
@@ -239,7 +238,7 @@ class Strategy:
         评估方法: 对某个测试结果中每个时间组的组合和指数的收益率对比,并计算该测试结果的内在收益率.
         某个测试结果战胜000300指数的比例为0则basic_ration基本比率为0.如某个结果共10个有效时间组(valid_groups),
         战胜000300指数的次数为8次,则basic_ration为0.8.选股组合的inner_rate内在收益率为各有效时间组组合总收益的复合收益率.
-        down_max为所有有效时间组中最大回测.计算basic_ratio、inner_rate、down_max
+        down_max为所有有效时间组中最大回测.计算basic_ratio、inner_rate、down_max, highest_rate和score.
         均使用有效时间组(valid_groups),即该时间组包含的股票数在5至25之间.
         :param test_condition: 测试条件,结构为{'strategy': 'ROE', 'test_condition': {...}}.
         :param test_result: 测试结果,策略类方法的返回值.
@@ -284,6 +283,7 @@ class Strategy:
         inner_rate = total_return ** (1 / years) - 1 if valid_groups else 0
         evaluate_result['inner_rate'] = round(inner_rate, 4)
         evaluate_result['down_max'] = round(min(rate_list), 4) if valid_groups else 0
+        evaluate_result['highest_rate'] = round(max(rate_list), 4) if valid_groups else 0
 
         # 调用calculate_score_of_test_condition计算综合评分score
         score = self.calculate_score_of_test_condition(
@@ -729,10 +729,10 @@ class Strategy:
             tmp_date = date.split(':')[1]  # 持股期间的起点
             tmp_stocks = []  # 保存筛选结果
             for stock in stocks: 
-                tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
-                xq_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_est')
-                if tmp_dividend >= dividend:
-                    stock = stock + (tmp_dividend, xq_dividend)
+                dv_ttm = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
+                dv_ratio = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ratio')
+                if dv_ratio >= dividend:
+                    stock = stock + (dv_ttm, dv_ratio)
                     tmp_stocks.append(stock)
             result[date] = tmp_stocks
         return result
@@ -801,10 +801,10 @@ class Strategy:
             tmp_date = date.split(':')[1]  # 持股期间的起点
             tmp_stocks = []
             for stock in stocks:
-                tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
-                xq_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_est')
-                if tmp_dividend >= dividend:
-                    stock = stock + (tmp_dividend, xq_dividend)
+                dv_ttm = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ttm')
+                dv_ratio = utils.get_indicator_in_trade_record(stock[0][0:6], tmp_date, 'dv_ratio')
+                if dv_ratio >= dividend:
+                    stock = stock + (dv_ttm, dv_ratio)
                     tmp_stocks.append(stock)
             result[date] = tmp_stocks
         return result
@@ -839,10 +839,10 @@ class Strategy:
             multi_yield = yield_10 * multi_value  # 当期10年国债利率的倍数
             tmp_stocks = []
             for stock in stocks:
-                tmp_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], trade_date, 'dv_ttm')
-                xq_dividend = utils.get_indicator_in_trade_record(stock[0][0:6], trade_date, 'dv_est')
-                if tmp_dividend >= multi_yield:
-                    stock = stock + (tmp_dividend, xq_dividend, multi_yield)
+                dv_ttm = utils.get_indicator_in_trade_record(stock[0][0:6], trade_date, 'dv_ttm')
+                dv_ratio = utils.get_indicator_in_trade_record(stock[0][0:6], trade_date, 'dv_ratio')
+                if dv_ratio >= multi_yield:
+                    stock = stock + (dv_ttm, dv_ratio, multi_yield)
                     tmp_stocks.append(stock)
             result[date] = tmp_stocks
         return result
@@ -1312,18 +1312,18 @@ if __name__ == "__main__":
             columns = [f"Y{item}" for item in columns]
             columns = ["股票代码", "股票名称", "申万行业"] + columns
             if msg.upper() == "ROE-DIVIDEND":
-                columns.append("DV_ts")
-                columns.append("DV_xq")
+                columns.append("DV_ttm")
+                columns.append("DV_ratio")
             elif msg.upper() == "ROE-MOS":
                 columns.append("MOS7")
             elif msg.upper() == "ROE-MOS-DIVIDEND":
                 columns.append("MOS7")
-                columns.append("DV_ts")
-                columns.append("DV_xq")
+                columns.append("DV_ttm")
+                columns.append("DV_ratio")
             elif msg.upper() == "ROE-MOS-MULTI-YIELD":
                 columns.append("MOS7")
-                columns.append("DV_ts")
-                columns.append("DV_xq")
+                columns.append("DV_ttm")
+                columns.append("DV_ratio")
                 columns.append("M_Yield")
             else:
                 pass
@@ -1341,6 +1341,7 @@ if __name__ == "__main__":
             print('--'*50)
         
         strategy = condition['strategy']
+        test_condition = condition['test_condition']
         if strategy in STRATEGIES:
             portfolio_test_result = stockbacktest.test_strategy_portfolio(
                 strategy=strategy, result=tmp_res, index_list=['000300']
@@ -1350,8 +1351,17 @@ if __name__ == "__main__":
                 test_result=tmp_res, 
                 portfolio_test_result=portfolio_test_result
             )
-            print("策略评估结果如下:")
-            print(f"{'basic_ratio:':<20} {evaluate_result['basic_ratio']:.2%}")
-            print(f"{'inner_rate:':<20} {evaluate_result['inner_rate']:.2%}")
-            print(f"{'down_max:':<20} {evaluate_result['down_max']:.2%}")
+            print(f"策略{strategy}测试结果:")
+            for key, value in test_condition.items():
+                if key == "holding_time":
+                    print(f"{key:<20}: {value}Ms")
+                elif key == "trade_month":
+                    print(f"{key:<20}: {value}M")
+                else:
+                    print(f"{key:<20}: {value}")
+            print(f"{'valid_groups':<20}: {evaluate_result['valid_groups']}")
+            print(f"{'basic_ratio':<20}: {evaluate_result['basic_ratio']:.2%}")
+            print(f"{'inner_rate':<20}: {evaluate_result['inner_rate']:.2%}")
+            print(f"{'down_max':<20}: {evaluate_result['down_max']:.2%}")
+            print(f"{'highest_rate':<20}: {evaluate_result['highest_rate']:.2%}")
             print('++'*50)

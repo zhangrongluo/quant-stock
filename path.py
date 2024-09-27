@@ -25,16 +25,16 @@ if not os.path.exists(INDEX_MOS_IMG):
     os.mkdir(INDEX_MOS_IMG)
 
 # 内置文件
-SW_INDUSTRY_PATH = os.path.join(ROOT_PATH, "stock-list")
-SW_INDUSTRY_XLS = os.path.join(ROOT_PATH, "stock-list", "sw-stock-list.xlsx")  # 申万行业分类文件
+# SW_INDUSTRY_PATH = os.path.join(ROOT_PATH, "stock-list")
+# SW_INDUSTRY_XLS = os.path.join(ROOT_PATH, "stock-list", "sw-stock-list.xlsx")  # 申万行业分类文件
 INDICATOR_ROE_FROM_1991 = os.path.join(ROOT_PATH, "data-package", "indicator-roe-from-1991.sqlite3")  # ROE数据文件
 CURVE_SQLITE3 = os.path.join(ROOT_PATH, "data-package", "curve.sqlite3")  # 国债收益率曲线数据文件
 TEST_CONDITION_SQLITE3 = os.path.join(ROOT_PATH, "test-condition", "test-condition.sqlite3")  # 测试条件数据文件
 INDEX_VALUE = os.path.join(ROOT_PATH, "data-package", "index-value.sqlite3")  # 指数数据文件
 
-if not os.path.exists(SW_INDUSTRY_XLS):
-    raise FileNotFoundError(f"未在{SW_INDUSTRY_PATH}发现申万行业分类清单文件,请检查.")
-SW_INDUSTRY_DF = pd.read_excel(SW_INDUSTRY_XLS, usecols=['股票代码', '公司简称', '新版一级行业'])
+# if not os.path.exists(SW_INDUSTRY_XLS):
+#     raise FileNotFoundError(f"未在{SW_INDUSTRY_PATH}发现申万行业分类清单文件,请检查.")
+# SW_INDUSTRY_DF = pd.read_excel(SW_INDUSTRY_XLS, usecols=['股票代码', '公司简称', '新版一级行业'])
 
 # 数据库表名
 ROE_TABLE = "indicators"  # indicator-roe-from-1991.sqlite3中的表
