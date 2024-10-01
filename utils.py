@@ -6,12 +6,13 @@ import datetime
 import time
 import random
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict, Union
+from typing import List, Tuple, Dict, Union, Literal
 import tushare as ts
 import data
 import tsswindustry as sw
 from path import (INDICATOR_ROE_FROM_1991, CURVE_SQLITE3, CURVE_TABLE, 
-                ROE_TABLE, TRADE_RECORD_PATH, INDEX_VALUE, STOCK_MOS_IMG, INDEX_MOS_IMG)
+                ROE_TABLE, TRADE_RECORD_PATH, INDEX_VALUE, STOCK_MOS_IMG, 
+                INDEX_MOS_IMG, UP_DOWN_IMG)
 
 def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     """
@@ -30,7 +31,7 @@ def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     if not date_regex.match(date):
         raise ValueError('参数date应为yyyy-mm-dd型字符串')
     if date < '2006-03-01':
-        raise ValueError('参数date不应早于2006-03-01')
+        date = '2006-03-01'
     today_str = datetime.datetime.now().strftime('%Y-%m-%d')
     if date > today_str:
         date = today_str
@@ -161,6 +162,38 @@ def calculate_index_rising_value(code: str, start_date: str, end_date: str) -> f
         df['rate'] = df['pct_chg'].apply(lambda x: x/100 + 1)
         rate = df['rate'].prod() - 1
     return rate
+
+def calculate_index_up_and_down_value_by_MOS(
+    index: Literal["000300", "399006", "000905"], 
+    date: str, 
+    mos_high: float, 
+    mos_low: float,
+) -> Tuple[float, float]:
+    """
+    根据MOS值计算指定日期潜在上涨幅度和下跌幅度.
+    :param index: 指数代码, 例如: '000300', '399006', '000905'
+    :param date: 日期, 例如: '2019-01-01'
+    :param mos_high: 高点MOS值, 例如: 0.75
+    :param mos_low: 低点MOS值, 例如: 0.10
+    :return: 返回潜在上涨幅度和下跌幅度
+    NOTE:
+    计算指定日期的MOS值mos
+    potential_up = ((1-mos_low)-(1-mos)) / (1-mos)=(mos-mos_low) / (1-mos)  # 潜在上涨幅度
+    potential_down = ((1-mos_high)-(1-mos)) / (1-mos)=(mos-mos_high) / (1-mos)  # 潜在下跌幅度
+    该指标用于判断持仓水平.
+    """
+    mos = calculate_index_MOS_from_2006(index, date)
+    if mos < mos_low or mos > mos_high:
+        raise ValueError("MOS值上下限设置错误")
+    potential_up = (mos - mos_low) / (1 - mos)
+    potential_down = (mos - mos_high) / (1 - mos)
+    return round(potential_up, 2), round(potential_down, 2)
+
+def calculate_stock_up_and_down_value_by_MOS():
+    """
+    计算股票潜在上涨幅度和下跌幅度.
+    """
+    pass
 
 def calculate_stock_rising_value(code: str, start_date: str, end_date: str) -> float:
     """
@@ -313,7 +346,7 @@ def draw_10y_yield_curve_figure():
     fig.set_size_inches(16, 10)
     plt.show()
 
-def save_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: bool = False):
+def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: bool = False):
     """ 
     绘制完整的MOS_7图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
@@ -385,7 +418,7 @@ def save_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: b
     if show_figure:
         plt.show()
 
-def save_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figure: bool = False):
+def draw_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figure: bool = False):
     """ 
     绘制完整的MOS图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
@@ -448,6 +481,92 @@ def save_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figu
     print(f"已保存{dest_file}")
     if show_figure:
         plt.show()
+
+def draw_index_up_to_down_value_figure(
+    index: str, 
+    start_date: str = "2006-03-01",
+    dset: str = UP_DOWN_IMG,
+    show_figure: bool = False
+):
+    """
+    绘制完整的潜在上涨幅度和下跌幅度图形保存到指定目录.
+    开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
+    则以2006-03-01为最早日期.结束日期为交易记录的最晚日期.
+    :param index: 指数代码, 例如: '000300', '399006', '000905'
+    :param start_date: 开始日期, 例如: '2019-01-01'
+    :param show_figure: 是否显示图形
+    """
+    full_code = f'{index}.SH' if index.startswith('000') else f'{index}.SZ'
+    con = sqlite3.connect(INDEX_VALUE)
+    with con:
+        sql = f"""
+        SELECT ts_code, trade_date, close FROM '{full_code}' 
+        WHERE trade_date>="{start_date.replace('-', '')}"
+        """
+        df = pd.read_sql(sql, con)
+        df["trade_date"] = df["trade_date"].astype(str)
+        dates = df['trade_date'].tolist()
+        dates = [date[:4] + '-' + date[4:6] + '-' + date[6:] for date in dates]
+        mos_list = []
+        for date in dates:
+            mos = calculate_index_MOS_from_2006(index, date)
+            mos_list.append(mos)
+        df["mos"] = mos_list
+        # 计算潜在上涨幅度和下跌幅度比例
+        up_list = []
+        down_list = []
+        for date in dates:
+            df_ratio = df[df['trade_date'] <= date.replace('-', '')]
+            mos_high = df_ratio['mos'].max()
+            mos_low = df_ratio['mos'].min()
+            up_value, down_value = calculate_index_up_and_down_value_by_MOS(
+                index=index, date=date, mos_high=mos_high, mos_low=mos_low
+            )
+            up_list.append(up_value)
+            down_list.append(down_value)
+        df["up_value"] = up_list
+        df["down_value"] = down_list
+    # 绘双轴图,左轴为close折线图，右轴为潜在上涨幅度和下跌幅度柱状图
+    plt.rcParams['font.sans-serif'] = ['Songti SC']  # 设置中文显示, 但不能显示负号-
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+    dates = dates[::-1]
+    close = df['close'].tolist()[::-1]
+    up_value = df['up_value'].tolist()[::-1]
+    down_value = df['down_value'].tolist()[::-1]
+    ax1.plot(dates, close, 'g-')
+    ax2.bar(dates, up_value, color='b', alpha=0.5, label='潜在上涨幅度')
+    ax2.bar(dates, down_value, color='r', alpha=0.5, label='潜在下跌幅度')
+    ax1.set_xlabel('日期')
+    ax1.set_ylabel(f'{index}指数收盘价', color='g')
+    ax2.set_ylabel('潜在上涨幅度和下跌幅度', color='b')
+    ax1.set_title(f"{full_code} 潜在上涨幅度和下跌幅度图(自 {dates[0]} 至 {dates[-1]})")
+    ax1.set_xticks(
+        [dates[0], dates[len(dates)//4], dates[len(dates)//2],
+        dates[len(dates)//4*3], dates[-1]]
+    )
+    ax1.grid(True)
+    fig = plt.gcf()
+    fig.set_size_inches(16, 10)
+    plt.legend()
+    # 保存图形
+    if not os.path.exists(dset):
+        os.mkdir(dset)
+    existed_files = [file for file in os.listdir(dset) if file.startswith(index)]
+    for file in existed_files:
+        os.remove(os.path.join(dset, file))
+    file_name = f"{index}-{dates[0]}-{dates[-1]}.png"
+    dest_file = os.path.join(dset, file_name)
+    plt.savefig(dest_file)
+    print(f"已保存{dest_file}")
+    if show_figure:
+        plt.show()
+
+def draw_stock_up_to_down_value_figure():
+    """
+    绘制股票潜在上涨幅度和下跌幅度图形.
+    """
+    pass
 
 def get_gaps_statistic_data(code: str, is_index: bool = False) -> Dict[str, List]:
     """ 

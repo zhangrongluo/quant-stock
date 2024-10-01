@@ -12,6 +12,7 @@ import time
 import shutil
 import sqlite3
 import pandas as pd
+import tushare as ts
 import datetime
 from concurrent.futures import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -26,6 +27,26 @@ semaphore = threading.Semaphore(5)
 scheduler = BackgroundScheduler()
 thread = threading.Thread(target=auto_test)
 codes = [item[0][0:6] for item in sw.get_all_stocks()]
+
+def is_trade_day(func):
+    """
+    装饰器,判断是否为交易日,如果是则执行数据更新函数.
+    :param func: 待执行的函数
+    :return: wrapper函数
+    """
+    def wrapper(*args, **kwargs):
+        today = time.strftime('%Y%m%d', time.localtime())
+        pro = ts.pro_api()
+        df = pro.trade_cal(
+            **{"exchange": "", "cal_date": today},
+            fields=["is_open"]
+        )
+        res = df["is_open"][0]
+        if res:
+            return func(*args, **kwargs)
+        else:
+            print(f"{today}为非交易日,不执行自动更新任务,请手动执行.")
+    return wrapper
 
 # 每日上午6点开始检查文件和数据完整性
 @scheduler.scheduled_job('cron', hour=6, minute=0, misfire_grace_time=600)
@@ -62,6 +83,7 @@ def check_integrity():
 
 # 每日下午8点0分开始更新一次trade record csv文件
 @scheduler.scheduled_job('cron', hour=20, minute=0, misfire_grace_time=3600)
+@is_trade_day
 def update_trade_record_csv():
     with semaphore:
         print('开始更新trade record csv文件\r', end='', flush=True)
@@ -69,7 +91,7 @@ def update_trade_record_csv():
             stocks = codes[index:index+20]
             with ThreadPoolExecutor() as executor:
                 executor.map(data.update_trade_record_csv, stocks)
-            time.sleep(1)
+            time.sleep(1.5)
         print('更新trade record csv文件完成.' + ' '*20, flush=True)
 
 # 每日下午6点30分开始更新一次curve.sqlite3
@@ -82,6 +104,7 @@ def update_curve_sqlite3():
 
 # 每日下午6点30分开始更新一次index_value.sqlite3
 @scheduler.scheduled_job('cron', hour=18, minute=30, misfire_grace_time=600)
+@is_trade_day
 def update_index_value_sqlite3():
     with semaphore:
         print('开始更新index_value.sqlite3\r', end='', flush=True)
@@ -130,8 +153,11 @@ def copy_condition_table():
 def update_indicator_roe_from_1991():
     with semaphore:
         print('开始更新indicator-roe-from-1991.sqlite3\r', end='', flush=True)
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            executor.map(data.update_ROE_indicators_table_from_1991, codes)
+        for index in range(0, len(codes), 20):
+            stocks = codes[index:index+20]
+            with ThreadPoolExecutor(max_workers=8) as executor:
+                executor.map(data.update_ROE_indicators_table_from_1991, codes)
+            time.sleep(1)
         print('更新indicator-roe-from-1991.sqlite3完成.' + ' '*20, flush=True)
 
 def run():

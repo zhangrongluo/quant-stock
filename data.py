@@ -231,27 +231,23 @@ def create_index_indicator_table(index: str='000300'):
             pct_chg REAL DEFAULT 0
         )"""
         con.executescript(sql)  # 创建表格
-
-        # 按照步长3000遍历日期序列,获取数据
+        # 使用tushare接口下载数据
         pro = ts.pro_api()
-        for i in range(0, len(date_list), 3000):
-            part_date_list = date_list[i:i+3000]
-            df = pro.index_dailybasic(ts_code=full_code, 
-            start_date=part_date_list[-1], end_date=part_date_list[0], 
-            fields='ts_code,trade_date,pb,pe,pe_ttm,turnover_rate,turnover_rate_f')
-            try:
-                df['roe_est'] = (df['pb'] / df['pe']).apply(lambda x: round(x, 4))  # 保留四位小数
-            except ZeroDivisionError:
-                df['roe_est'] = 0.0000
-            # 下载pct_chg列合并到df中,并按照trade_date降序排列
-            df_chg = pro.index_daily(ts_code=full_code, start_date=part_date_list[-1], 
-            end_date=part_date_list[0], fields="trade_date, pct_chg")
-            df = df.set_index('trade_date')
-            df_chg = df_chg.set_index('trade_date')
-            df = df.join(df_chg, how='inner')
-            df.reset_index(inplace=True)
-            df.drop_duplicates(subset=['trade_date'], keep='last', inplace=True)
-            df.to_sql(name=full_code, con=con, index=False, if_exists='append')
+        df = pro.index_dailybasic(ts_code=full_code, 
+            fields='ts_code,trade_date,pb,pe,pe_ttm,turnover_rate,turnover_rate_f'
+        )
+        try:
+            df['roe_est'] = (df['pb'] / df['pe']).apply(lambda x: round(x, 4))  # 保留四位小数
+        except ZeroDivisionError:
+            df['roe_est'] = 0.0000
+        df_1 = pro.index_daily(
+            ts_code=full_code, fields="trade_date, pct_chg, close, vol, amount"
+        )
+        df = df.set_index('trade_date')
+        df_1 = df_1.set_index('trade_date')
+        df = df.join(df_1, how='inner')
+        df.reset_index(inplace=True)
+        df.to_sql(name=full_code, con=con, index=False, if_exists='replace')
 
 def create_trade_record_csv_table(code: str, rm_empty_rows: bool = False) -> None:
     """
@@ -477,7 +473,6 @@ def update_curve_value_table():
         create_curve_value_table(days=delta_day)
     print(f"国债收率表更新成功." + ' '*20 + '\r', end='', flush=True)
 
-
 if __name__ == '__main__':
     stocks = [item[0][0:6] for item in sw.get_all_stocks()]
     while True:
@@ -492,12 +487,11 @@ if __name__ == '__main__':
             break
         elif msg.upper() == 'CREATE-TRADE-CSV':
             print('正在创建trade-record csv文件,请稍等...\r', end='', flush=True)
-            # create_all_stocks_trade_record_csv_table()  # 使用线程池经常会中断,原因未知
             for index in range(0, len(stocks), 20):
                 codes = stocks[index:index+20]
                 with ThreadPoolExecutor() as pool:
                     pool.map(create_trade_record_csv_table, codes)
-                time.sleep(1)
+                time.sleep(1.5)
             print('trade-record csv文件创建成功.'+ ' '*50)
         elif msg.upper() == 'CREATE-CURVE':
             print('正在创建curve表格,请稍等...\r', end='', flush=True)
@@ -512,7 +506,7 @@ if __name__ == '__main__':
                 codes = stocks[index:index+20]
                 with ThreadPoolExecutor() as pool:
                     pool.map(create_ROE_indicators_table_from_1991, codes)
-                time.sleep(1)
+                time.sleep(1.5)
             print('indicators表格创建成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-TRADE-CSV':
             print('正在更新trade-record csv文件,请稍等...\r', end='', flush=True)
@@ -520,7 +514,7 @@ if __name__ == '__main__':
                 codes = stocks[index:index+20]
                 with ThreadPoolExecutor() as pool:
                     pool.map(update_trade_record_csv, codes)
-                time.sleep(1)
+                time.sleep(1.5)
             print('trade-record csv文件更新成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-CURVE':
             print('正在更新curve表格,请稍等...\r', end='', flush=True)
@@ -536,8 +530,11 @@ if __name__ == '__main__':
                 df = df[df.iloc[:, 3].isnull()]  # 取出最新年度ROE字段为空的股票代码
                 null_stocks = df['stockcode'].values.tolist()
                 null_stocks = [code[0:6] for code in null_stocks]
-            with ThreadPoolExecutor() as pool:
-                pool.map(update_ROE_indicators_table_from_1991, null_stocks)
+            for index in range(0, len(null_stocks), 20):
+                null_codes = null_stocks[index:index+20]
+                with ThreadPoolExecutor() as pool:
+                    pool.map(update_ROE_indicators_table_from_1991, null_codes)
+                time.sleep(1.5)
             print('indicators表格更新成功.'+ ' '*50)
         elif msg.upper() == 'CREATE-INDEX-VALUE':
             print('正在创建指数估值数据库,请稍等...\r', end='', flush=True)
