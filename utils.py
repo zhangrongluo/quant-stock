@@ -364,7 +364,7 @@ def draw_10y_yield_curve_figure():
     fig.set_size_inches(16, 10)
     plt.show()
 
-def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: bool = False):
+def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: bool = True):
     """ 
     绘制完整的MOS_7图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
@@ -375,43 +375,38 @@ def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: b
     """
     sw_class = sw.get_name_and_class_by_code(code)[1]
     csv_file = os.path.join(TRADE_RECORD_PATH, sw_class, f"{code}.csv")
-    df = pd.read_csv(csv_file)
-    df['trade_date'] = pd.to_datetime(df['trade_date'], format='%Y%m%d')
-    earliest_date = df['trade_date'].min()
-    latest_date = df['trade_date'].max()
-    start_date1 = datetime.datetime.strptime('2006-03-01', '%Y-%m-%d')
-    if earliest_date < start_date1:
-        start_date = "2006-03-01"
-    else:
-        start_date = earliest_date.strftime("%Y-%m-%d")
-    end_date = latest_date.strftime("%Y-%m-%d")
-    
-    date_range = pd.date_range(
-        start=start_date, end=end_date, freq='D'
-    ).strftime("%Y-%m-%d").tolist()
+    df = pd.read_csv(csv_file, dtype={'trade_date': str})
+    dates = df['trade_date'].tolist()
+    start_date = dates[-1]
+    end_date = dates[0]
+    if start_date < '20060301':
+        start_date = '20060301'
+    df = df[df['trade_date'] >= start_date]
+    dates = [date[0:4] + '-' + date[4:6] + '-' + date[6:8] for date in dates]
     mos_list = []
-    for date in date_range:
+    for date in dates:
         tmp = calculate_MOS_7_from_2006(code=code, date=date)
         mos_list.append(tmp)
-
+    # 画图
+    dates = dates[::-1]
+    mos_list = mos_list[::-1]
     plt.rcParams['font.sans-serif'] = ['Songti SC'] # 设置中文显示
-    plt.plot(date_range, mos_list)
-    plt.fill_between(date_range, mos_list, color='grey', alpha=0.1)
+    plt.plot(dates, mos_list)
+    plt.fill_between(dates, mos_list, color='grey', alpha=0.1)
     name = sw.get_name_and_class_by_code(code)[0]  # 设置标题
-    title = f"{name} MOS-7 曲线图 (自 {start_date} 到 {end_date})"
+    title = f"{code} {name} MOS-7 曲线图 (自 {start_date} 到 {end_date})"
     plt.title(title)
     plt.xticks(
-        [date_range[0], date_range[len(date_range)//4], 
-        date_range[len(date_range)//2], 
-        date_range[len(date_range)//4*3], date_range[-1]]
+        [dates[0], dates[len(dates)//4], dates[len(dates)//2], 
+        dates[len(dates)//4*3], dates[-1]]
     )  # 设置x轴刻度
     plt.gca().yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )  # 设置y轴刻度
     max_mos = max(mos_list)  # 设置最高点和最低点
     min_mos = min(mos_list)
-    max_date = date_range[mos_list.index(max_mos)]
-    min_date = date_range[mos_list.index(min_mos)]
+    max_date = dates[mos_list.index(max_mos)]
+    min_date = dates[mos_list.index(min_mos)]
     plt.text(
         max_date, max_mos, f"最高点: {max_mos:.2%}", ha='center', va='bottom', fontsize=12
     )
@@ -427,9 +422,7 @@ def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: b
     existed_files = [file for file in os.listdir(dest) if file.startswith(code)]
     for file in existed_files:
         os.remove(os.path.join(dest, file))
-    s = start_date.replace('-', '')
-    e = end_date.replace('-', '')
-    file_name = f"{code}-{s}-{e}.png"
+    file_name = f"{code}-{name}-{start_date}-{end_date}.pdf"
     dest_file = os.path.join(dest, file_name)
     plt.savefig(dest_file)
     print(f"已保存{dest_file}")
@@ -574,17 +567,24 @@ def draw_index_up_to_down_value_figure(
     ax2.yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )
+    # 显示ax2最后一个柱状图的数值
+    ax2.text(
+        dates[-1], up_value[-1], f"{up_value[-1]:.2%}", ha='center', va='bottom', fontsize=10
+    )
+    ax2.text(
+        dates[-1], down_value[-1], f"{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
+    )
     ax1.grid(True)
     fig = plt.gcf()
     fig.set_size_inches(16, 10)
-    plt.legend()
+    plt.legend(loc='upper left')  # 显示图例
     # 保存图形
     if not os.path.exists(dset):
         os.mkdir(dset)
     existed_files = [file for file in os.listdir(dset) if file.startswith(index)]
     for file in existed_files:
         os.remove(os.path.join(dset, file))
-    file_name = f"{index}-{dates[0].replace('-', '')}-{dates[-1].replace('-', '')}.png"
+    file_name = f"{index}-{dates[0].replace('-', '')}-{dates[-1].replace('-', '')}.pdf"
     dest_file = os.path.join(dset, file_name)
     plt.savefig(dest_file)
     print(f"已保存{dest_file}")
@@ -607,6 +607,7 @@ def draw_stock_up_to_down_value_figure(
     :param months_offset: 绘制的月份向前偏移量
     :param show_figure: 是否显示图形
     """
+    name = sw.get_name_and_class_by_code(code)[0]
     sw_class = sw.get_name_and_class_by_code(code)[1]
     csv_file = os.path.join(TRADE_RECORD_PATH, sw_class, f"{code}.csv")
     df = pd.read_csv(csv_file, dtype={'trade_date': str})
@@ -652,7 +653,7 @@ def draw_stock_up_to_down_value_figure(
     ax1.set_xlabel('日期')
     ax1.set_ylabel(f'{code}股票收盘价', color='g')
     ax2.set_ylabel('潜在上涨幅度和下跌幅度', color='b')
-    ax1.set_title(f"{code} 潜在上涨幅度和下跌幅度图(自 {dates[0]} 至 {dates[-1]})")
+    ax1.set_title(f"{code} {name} 潜在上涨幅度和下跌幅度图(自 {dates[0]} 至 {dates[-1]})")
     ax1.set_xticks(
         [dates[0], dates[len(dates)//4], dates[len(dates)//2], 
         dates[len(dates)//4*3], dates[-1]]
@@ -660,17 +661,24 @@ def draw_stock_up_to_down_value_figure(
     ax2.yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )
+    # 显示ax2最后一个柱状图的数值
+    ax2.text(
+        dates[-1], up_value[-1], f"{up_value[-1]:.2%}", ha='center', va='bottom', fontsize=10
+    )
+    ax2.text(
+        dates[-1], down_value[-1], f"{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
+    )
     ax1.grid(True)
     fig = plt.gcf()
     fig.set_size_inches(16, 10)
-    plt.legend()
+    plt.legend(loc='upper left')
     # 保存图形
     if not os.path.exists(dest):
         os.mkdir(dest)
     existed_files = [file for file in os.listdir(dest) if file.startswith(code)]
     for file in existed_files:
         os.remove(os.path.join(dest, file))
-    file_name = f"{code}-{dates[0].replace('-', '')}-{dates[-1].replace('-', '')}.png"
+    file_name = f"{code}-{name}-{dates[0].replace('-', '')}-{dates[-1].replace('-', '')}.pdf"
     dest_file = os.path.join(dest, file_name)
     plt.savefig(dest_file)
     print(f"已保存{dest_file}")
