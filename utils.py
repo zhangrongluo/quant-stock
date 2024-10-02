@@ -429,7 +429,7 @@ def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: b
     if show_figure:
         plt.show()
 
-def draw_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figure: bool = False):
+def draw_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figure: bool = True):
     """ 
     绘制完整的MOS图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
@@ -475,7 +475,7 @@ def draw_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figu
     plt.text(
         min_date, min_mos, f"最低点: {min_mos:.2%}", ha='center', va='top', fontsize=12
     )
-    plt.gca().yaxis.grid(True)  # 显示网格
+    plt.gca().yaxis.grid(True)
     fig = plt.gcf()
     fig.set_size_inches(16, 10)
 
@@ -559,7 +559,7 @@ def draw_index_up_to_down_value_figure(
     ax1.set_xlabel('日期')
     ax1.set_ylabel(f'{index}指数收盘价', color='g')
     ax2.set_ylabel('潜在上涨幅度和下跌幅度', color='b')
-    ax1.set_title(f"{index} 潜在上涨幅度和下跌幅度图(自 {dates[0]} 至 {dates[-1]})")
+    ax1.set_title(f"{full_code}(指数) 潜在上涨幅度和下跌幅度图(自 {dates[0]} 至 {dates[-1]})")
     ax1.set_xticks(
         [dates[0], dates[len(dates)//4], dates[len(dates)//2], 
         dates[len(dates)//4*3], dates[-1]]
@@ -577,14 +577,14 @@ def draw_index_up_to_down_value_figure(
     ax1.grid(True)
     fig = plt.gcf()
     fig.set_size_inches(16, 10)
-    plt.legend(loc='upper left')  # 显示图例
+    plt.legend(loc='upper left')
     # 保存图形
     if not os.path.exists(dset):
         os.mkdir(dset)
     existed_files = [file for file in os.listdir(dset) if file.startswith(index)]
     for file in existed_files:
         os.remove(os.path.join(dset, file))
-    file_name = f"{index}-{dates[0].replace('-', '')}-{dates[-1].replace('-', '')}.pdf"
+    file_name = f"{full_code}(指数)-{dates[0].replace('-', '')}-{dates[-1].replace('-', '')}.pdf"
     dest_file = os.path.join(dset, file_name)
     plt.savefig(dest_file)
     print(f"已保存{dest_file}")

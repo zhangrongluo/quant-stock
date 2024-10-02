@@ -200,17 +200,13 @@ def create_index_indicator_table(index: str='000300'):
     NOTE:
     数据期间从20040101开始至今日(tushare接口限制)
     数据库名称为INDEX_VALUE,表名为000300.SH, 000905.SH, 399006.SH
-    指标包括ts_code,trade_date,pb,pe,turnover_rate,pe_ttm,turnover_rate_f和pct_chg
+    指标包括ts_code,trade_date,pb,pe,turnover_rate,pe_ttm,turnover_rate_f,pct_chg,close,vol,amount
     NOTE:
     此外再加一个roe预估数=pb/pe
     """
     if index not in ['000300', '000905', '399006']:
         raise ValueError('请检查指数代码是否正确[000300, 000905, 399006]')
     full_code = index + '.SH' if index.startswith('000') else index + '.SZ'
-    start_date = '20040101'
-    end_date = time.strftime('%Y%m%d', time.localtime(time.time()))
-    date_list = pd.date_range(start_date, end_date).strftime("%Y%m%d")[::-1]  # 生成日期序列
-
     con = sqlite3.connect(INDEX_VALUE)
     with con:
         sql = f"""
@@ -231,11 +227,28 @@ def create_index_indicator_table(index: str='000300'):
             pct_chg REAL DEFAULT 0
         )"""
         con.executescript(sql)  # 创建表格
-        # 使用tushare接口下载数据
+        # 每次下载3000条数据
         pro = ts.pro_api()
-        df = pro.index_dailybasic(ts_code=full_code, 
-            fields='ts_code,trade_date,pb,pe,pe_ttm,turnover_rate,turnover_rate_f'
-        )
+        df_list = []
+        today = pd.Timestamp.today()
+        for i in range(100):
+            if i == 0:
+                start_date = (today - pd.Timedelta(days=3000)).strftime("%Y%m%d")
+                end_date = today.strftime("%Y%m%d")
+            else:
+                start_date = (today - pd.Timedelta(days=3000*(i+1))).strftime("%Y%m%d")
+                end_date = (today - pd.Timedelta(days=3000*i)).strftime("%Y%m%d")
+            df = pro.index_dailybasic(
+                **{"ts_code": full_code,"start_date": start_date, "end_date": end_date,},
+                fields='ts_code,trade_date,pb,pe,pe_ttm,turnover_rate,turnover_rate_f'
+            )
+            if not df.empty:
+                df_list.append(df)
+            else:
+                break
+            time.sleep(1)
+        df = pd.concat(df_list)
+        df = df.sort_values(by='trade_date', ascending=False)
         try:
             df['roe_est'] = (df['pb'] / df['pe']).apply(lambda x: round(x, 4))  # 保留四位小数
         except ZeroDivisionError:
@@ -243,10 +256,12 @@ def create_index_indicator_table(index: str='000300'):
         df_1 = pro.index_daily(
             ts_code=full_code, fields="trade_date, pct_chg, close, vol, amount"
         )
+        df_1 = df_1.sort_values(by='trade_date', ascending=False)
         df = df.set_index('trade_date')
         df_1 = df_1.set_index('trade_date')
         df = df.join(df_1, how='inner')
         df.reset_index(inplace=True)
+        df = df.sort_values(by='trade_date', ascending=False)
         df.to_sql(name=full_code, con=con, index=False, if_exists='replace')
 
 def create_trade_record_csv_table(code: str, rm_empty_rows: bool = False) -> None:
@@ -455,6 +470,50 @@ def update_trade_record_csv(code: str):
     df_new.to_csv(csv_file, index=False)  # 保存文件
     print(f"{full_code}历史交易记录文件更新成功." + " "*20 + '\r', end='', flush=True)
 
+def update_index_indicator_table(index: str='000300'):
+    """ 
+    更新指数估值数据库,用以计算指数MOS
+    :param index: '000300' or '000905' or '399006'
+    NOTE:
+    数据期间从20040101开始至今日(tushare接口限制)
+    数据库名称为INDEX_VALUE,表名为000300.SH, 000905.SH, 399006.SH
+    指标包括ts_code,trade_date,pb,pe,turnover_rate,pe_ttm,turnover_rate_f,pct_chg,close,vol,amount
+    """
+    full_code = index + '.SH' if index.startswith('000') else index + '.SZ'
+    pro = ts.pro_api()
+    con = sqlite3.connect(INDEX_VALUE)
+    with con:
+        sql = f""" SELECT * FROM '{full_code}' """
+        df = pd.read_sql_query(sql, con)
+        df['trade_date'] = df['trade_date'].astype('object')
+        last_date = df['trade_date'][0]
+        today = pd.Timestamp.today().strftime("%Y%m%d")
+        # 获取增量数据
+        df1 = pro.index_dailybasic(
+            ts_code=full_code, start_date=last_date, end_date=today,
+            fields='ts_code,trade_date,pb,pe,pe_ttm,turnover_rate,turnover_rate_f'
+        )
+        try:
+            df1['roe_est'] = (df1['pb'] / df1['pe']).apply(lambda x: round(x, 4))  # 保留四位小数
+        except ZeroDivisionError:
+            df1['roe_est'] = 0.0000
+        df1 = df1.sort_values(by='trade_date', ascending=False)
+        df2 = pro.index_daily(
+            ts_code=full_code, start_date=last_date, end_date=today,
+            fields="trade_date, pct_chg, close, vol, amount"
+        )
+        df2 = df2.sort_values(by='trade_date', ascending=False)
+        df1 = df1.set_index('trade_date')
+        df2 = df2.set_index('trade_date')
+        df1 = df1.join(df2, how='inner')
+        df1.reset_index(inplace=True)
+        df1 = df1.sort_values(by='trade_date', ascending=False)
+        # 数据合并
+        df = pd.concat([df1, df], axis=0)
+        df = df.drop_duplicates(subset=['trade_date'], keep='first')
+        df.to_sql(name=full_code, con=con, index=False, if_exists='replace')
+    print(f"{full_code}指数估值数据库更新成功." + ' '*20 + '\r', end='', flush=True)
+
 def update_curve_value_table():
     """
     刷新国债收率表至昨日数据, 须每日定期执行, 避免在计算MOS时出错
@@ -479,8 +538,8 @@ if __name__ == '__main__':
         print('-------------------------操作提示-------------------------')
         print('Create-Trade-CSV      Create-Curve       Create-Roe-Table')
         print('Update-Trade-CSV      Update-Curve       Update-ROE-Table')
-        print('Create-Index-Value    Sort-Conditions    Check-Integrity ')
-        print('Quit'                                                     )
+        print('Create-Index-Value    Update-Index-Value Check-Integrity ')
+        print('Sort-Conditions       Quit                               ')
         print('---------------------------------------------------------')
         msg = input('>>>> 请选择操作提示 >>>>  ')
         if msg.upper()  == 'QUIT':
@@ -541,6 +600,11 @@ if __name__ == '__main__':
             for index in ["000300", "000905", "399006"]:
                 create_index_indicator_table(index)
             print('指数估值数据库创建成功.'+ ' '*20)
+        elif msg.upper() == 'UPDATE-INDEX-VALUE':
+            print('正在更新指数估值数据库,请稍等...\r', end='', flush=True)
+            for index in ["000300", "000905", "399006"]:
+                update_index_indicator_table(index)
+            print('指数估值数据库更新成功.'+ ' '*20)
         elif msg.upper() == 'SORT-CONDITIONS':
             print('正在排序条件表格,请稍等...\r', end='', flush=True)
             if not os.path.exists(TEST_CONDITION_SQLITE3):
