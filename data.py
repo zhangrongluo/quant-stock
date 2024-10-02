@@ -538,8 +538,8 @@ if __name__ == '__main__':
         print('-------------------------操作提示-------------------------')
         print('Create-Trade-CSV      Create-Curve       Create-Roe-Table')
         print('Update-Trade-CSV      Update-Curve       Update-ROE-Table')
-        print('Create-Index-Value    Update-Index-Value Check-Integrity ')
-        print('Sort-Conditions       Quit                               ')
+        print('Create-Index-Value    Sort-Conditionse   Check-Integrity ')
+        print('Update-Index-Value    Quit                               ')
         print('---------------------------------------------------------')
         msg = input('>>>> 请选择操作提示 >>>>  ')
         if msg.upper()  == 'QUIT':

@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 import tsswindustry as sw
 import data
+import utils
 from test import auto_test
 from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH, INDICATOR_ROE_FROM_1991, ROE_TABLE
 import threading
@@ -45,7 +46,7 @@ def is_trade_day(func):
         if res:
             return func(*args, **kwargs)
         else:
-            print(f"{today}为非交易日,不执行自动更新任务,请手动执行.")
+            pass
     return wrapper
 
 # 每日上午6点开始检查文件和数据完整性
@@ -96,6 +97,7 @@ def update_trade_record_csv():
 
 # 每日下午6点30分开始更新一次curve.sqlite3
 @scheduler.scheduled_job('cron', hour=18, minute=30, misfire_grace_time=600)
+@is_trade_day
 def update_curve_sqlite3():
     with semaphore:
         print('开始更新curve.sqlite3\r', end='', flush=True)
@@ -109,8 +111,23 @@ def update_index_value_sqlite3():
     with semaphore:
         print('开始更新index_value.sqlite3\r', end='', flush=True)
         for index in ["000300", "000905", "399006"]:
-            data.create_index_indicator_table(index)
+            data.update_index_indicator_table(index)
         print('更新index_value.sqlite3完成.' + ' '*20, flush=True)
+
+# 每天下午6点45分绘制指数MOS和UP-DOWN-VALUE图
+@scheduler.scheduled_job('cron', hour=18, minute=45, misfire_grace_time=600)
+@is_trade_day
+def draw_index_mos_and_up_down_value_figure():
+    with semaphore:
+        indexes = ["000300", "000905", "399006"]
+        for index in indexes:
+            utils.draw_index_up_to_down_value_figure(
+                index=index, years_offset=20, show_figure=False
+            )
+            utils.draw_whole_index_MOS_figure(
+                index=index, show_figure=False
+            )
+        print('绘制指数MOS和UP-DOWN-VALUE图完成.' + ' '*20, flush=True)
 
 # 每周五下午6点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
 # 然后推送到gitee main分支. 本地仓库路径IMAC_REPOSITORY_PATH
@@ -128,25 +145,25 @@ def copy_test_condition_sqlite3():
             os.chdir(ROOT_PATH)
             print('推送到gitee main分支完成.' + ' '*20, flush=True)
 
-# 每月25日下午6点0分开始,将src中table_name表中的数据复制到
-# dest中的table_name+“from-win"表中.
-src = "/Users/zhangrongluo/Desktop/win-stock/tmp-file/test-condition.sqlite3"
-dest = "/Users/zhangrongluo/Desktop/quant-stock/test-condition/test-condition.sqlite3"
-@scheduler.scheduled_job('cron', day=25, hour=18, minute=0, misfire_grace_time=600)
-def copy_condition_table():
-    with semaphore:
-        print('开始复制test-condition.sqlite3\r', end='', flush=True)
-        now = time.localtime()
-        table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
-        con_src = sqlite3.connect(src)
-        con_dest = sqlite3.connect(dest)
-        with con_src:
-            sql = f"""
-                SELECT * FROM '{table_name}'
-            """
-            df = pd.read_sql(sql, con_src)
-            df.to_sql(f'{table_name}-from-win', con_dest, if_exists='replace', index=False)
-            print(f"表{table_name}复制完成.")
+# # 每月25日下午6点0分开始,将src中table_name表中的数据复制到
+# # dest中的table_name+“from-win"表中.
+# src = "/Users/zhangrongluo/Desktop/win-stock/tmp-file/test-condition.sqlite3"
+# dest = "/Users/zhangrongluo/Desktop/quant-stock/test-condition/test-condition.sqlite3"
+# @scheduler.scheduled_job('cron', day=25, hour=18, minute=0, misfire_grace_time=600)
+# def copy_condition_table():
+#     with semaphore:
+#         print('开始复制test-condition.sqlite3\r', end='', flush=True)
+#         now = time.localtime()
+#         table_name = f'condition-{now.tm_year}' if now.tm_mon >= 5 else f'condition-{now.tm_year-1}'
+#         con_src = sqlite3.connect(src)
+#         con_dest = sqlite3.connect(dest)
+#         with con_src:
+#             sql = f"""
+#                 SELECT * FROM '{table_name}'
+#             """
+#             df = pd.read_sql(sql, con_src)
+#             df.to_sql(f'{table_name}-from-win', con_dest, if_exists='replace', index=False)
+#             print(f"表{table_name}复制完成.")
             
 # 每年5月1日上午0点0分1秒更新indicator-roe-from-1991.sqlite3
 @scheduler.scheduled_job('cron', month=5, day=1, hour=0, minute=0, second=1, misfire_grace_time=600)

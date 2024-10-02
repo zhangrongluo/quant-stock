@@ -324,8 +324,6 @@ def get_indicator_in_trade_record(code: str, date: str, fields: str) -> float:
     :param date: 日期, 例如: '2019-01-01'
     :return: 指定字段的值
     """
-    # if fields not in ['pe_ttm', 'pb', 'ps_ttm', 'dv_ttm', 'total_mv', 'circ_mv', 'dv_est']:
-    #     raise ValueError('参数fields应在pe_ttm, pb, ps_ttm, dv_ttm, total_mv, circ_mv, dv_est中')
     row = find_closest_row_in_trade_record(code, date)
     return row[fields].values[0]
 
@@ -574,6 +572,12 @@ def draw_index_up_to_down_value_figure(
     ax2.text(
         dates[-1], down_value[-1], f"{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
     )
+    # 以down_value中最小值画一条红色水平线,在水平线最右边位置标注金额
+    min_down_value = min(down_value)
+    ax2.axhline(y=min_down_value, color='r', linestyle='--')
+    ax2.text(
+        dates[-1], min_down_value, f"{min_down_value:.2%}", ha='center', va='top', fontsize=10
+    )
     ax1.grid(True)
     fig = plt.gcf()
     fig.set_size_inches(16, 10)
@@ -667,6 +671,12 @@ def draw_stock_up_to_down_value_figure(
     )
     ax2.text(
         dates[-1], down_value[-1], f"{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
+    )
+    # 以down_value中最小值画一条红色水平线,在水平线最右边位置标注金额
+    min_down_value = min(down_value)
+    ax2.axhline(y=min_down_value, color='r', linestyle='--')
+    ax2.text(
+        dates[-1], min_down_value, f"{min_down_value:.2%}", ha='center', va='top', fontsize=10
     )
     ax1.grid(True)
     fig = plt.gcf()
