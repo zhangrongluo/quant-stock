@@ -491,11 +491,14 @@ def draw_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figu
     if show_figure:
         plt.show()
 
-def draw_index_up_to_down_value_figure(
-    index: str, 
+def draw_index_up_and_down_value_figure(
+    index: str,
+    end_date : str = "",
     years_offset: int = 7,
     months_offset: int = 0,
+    down_value_target: float = -0.25,
     dset: str = INDEX_UP_DOWN_IMG,
+    remove_existed_img: bool = True,
     show_figure: bool = True
 ):
     """
@@ -503,22 +506,28 @@ def draw_index_up_to_down_value_figure(
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
     则以2006-03-01为最早日期.结束日期为交易记录的最晚日期.
     :param index: 指数代码, 例如: '000300', '399006', '000905'
+    :param end_date: 结束日期, 例如: '2019-01-01',默认为空字符串取值为today
     :param years_offset: 绘制的年份向前偏移量
     :param months_offset: 绘制的月份向前偏移量
+    :param down_value_target: 指定的下跌幅度目标
+    :param dset: 图形保存目录
+    :param remove_existed_img: 是否删除已存在的图形文件
     :param show_figure: 是否显示图形
     """
     full_code = f'{index}.SH' if index.startswith('000') else f'{index}.SZ'
     con = sqlite3.connect(INDEX_VALUE)
     # 推算开始日期
     today = pd.Timestamp.today()
-    ten_years_ago = today - pd.DateOffset(years=years_offset, months=months_offset)
-    start_date = ten_years_ago.strftime("%Y%m%d")
+    end_date = today if not end_date else pd.Timestamp(end_date)
+    start_date = end_date - pd.DateOffset(years=years_offset, months=months_offset)
+    end_date = end_date.strftime("%Y%m%d")
+    start_date = start_date.strftime("%Y%m%d")
     if start_date < '20060301':
         start_date = '20060301'
     with con:
         sql = f"""
         SELECT ts_code, trade_date, close FROM '{full_code}' 
-        WHERE trade_date>="{start_date}"
+        WHERE trade_date>="{start_date}" AND trade_date<="{end_date}"
         """
         df = pd.read_sql(sql, con)
         df["trade_date"] = df["trade_date"].astype(str)
@@ -565,18 +574,26 @@ def draw_index_up_to_down_value_figure(
     ax2.yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )
-    # 显示ax2最后一个柱状图的数值
-    ax2.text(
-        dates[-1], up_value[-1], f"{up_value[-1]:.2%}", ha='center', va='bottom', fontsize=10
+    # 显示ax1,ax2最后一个位置的数值
+    ax1.text(
+        dates[-1], close[-1], f"最新:{close[-1]:.2f}", ha='center', va='bottom', fontsize=10
     )
     ax2.text(
-        dates[-1], down_value[-1], f"{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
+        dates[-1], up_value[-1], f"最新:{up_value[-1]:.2%}", ha='center', va='bottom', fontsize=10
     )
-    # 以down_value中最小值画一条红色水平线,在水平线最右边位置标注金额
+    ax2.text(
+        dates[-1], down_value[-1], f"最新:{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
+    )
+    # 以down_value_target画一条红色水平线,在水平线中间位置标注金额
+    ax2.axhline(y=down_value_target, color='r', linestyle='--')
+    ax2.text(
+        dates[len(dates)//2], down_value_target, f"目标:{down_value_target:.2%}", ha='center', va='top', fontsize=10
+    )
+    # 以down_value中最小值画一条红色水平线,在水平线中间位置标注金额
     min_down_value = min(down_value)
     ax2.axhline(y=min_down_value, color='r', linestyle='--')
     ax2.text(
-        dates[-1], min_down_value, f"{min_down_value:.2%}", ha='center', va='top', fontsize=10
+        dates[len(dates)//2], min_down_value, f"最低:{min_down_value:.2%}", ha='center', va='top', fontsize=10
     )
     ax1.grid(True)
     fig = plt.gcf()
@@ -585,9 +602,10 @@ def draw_index_up_to_down_value_figure(
     # 保存图形
     if not os.path.exists(dset):
         os.mkdir(dset)
-    existed_files = [file for file in os.listdir(dset) if file.startswith(index)]
-    for file in existed_files:
-        os.remove(os.path.join(dset, file))
+    if remove_existed_img:
+        existed_files = [file for file in os.listdir(dset) if file.startswith(index)]
+        for file in existed_files:
+            os.remove(os.path.join(dset, file))
     file_name = f"{full_code}(指数)-{dates[0].replace('-', '')}-{dates[-1].replace('-', '')}.pdf"
     dest_file = os.path.join(dset, file_name)
     plt.savefig(dest_file)
@@ -595,11 +613,14 @@ def draw_index_up_to_down_value_figure(
     if show_figure:
         plt.show()
 
-def draw_stock_up_to_down_value_figure(
+def draw_stock_up_and_down_value_figure(
     code: str,
+    end_date: str = "",
     years_offset: int = 7,
     months_offset: int = 0,
+    down_value_target: float = -0.30,
     dest: str = STOCK_UP_DOWN_IMG,
+    remove_existed_img: bool = True,
     show_figure: bool = True
 ):
     """
@@ -607,8 +628,12 @@ def draw_stock_up_to_down_value_figure(
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
     则以2006-03-01为最早日期.结束日期为交易记录的最晚日期.
     :param code: 股票代码, 例如: '600000' or '000001'
+    :param start_date: 开始日期, 例如: '2019-01-01'
     :param years_offset: 绘制的年份向前偏移量
     :param months_offset: 绘制的月份向前偏移量
+    :param down_value_target: 指定的下跌幅度目标
+    :param dest: 图形保存目录
+    :param remove_existed_img: 是否删除已存在的图形文件
     :param show_figure: 是否显示图形
     """
     name = sw.get_name_and_class_by_code(code)[0]
@@ -617,11 +642,14 @@ def draw_stock_up_to_down_value_figure(
     df = pd.read_csv(csv_file, dtype={'trade_date': str})
     # 推算开始日期
     today = pd.Timestamp.today()
-    ten_years_ago = today - pd.DateOffset(years=years_offset, months=months_offset)
-    start_date = ten_years_ago.strftime("%Y%m%d")
+    end_date = today if not end_date else pd.Timestamp(end_date)
+    start_date = today - pd.DateOffset(years=years_offset, months=months_offset)
+    end_date = end_date.strftime("%Y%m%d")
+    start_date = start_date.strftime("%Y%m%d")
     if start_date < '20060301':
         start_date = '20060301'
     df = df[df['trade_date'] >= start_date]
+    df = df[df['trade_date'] <= end_date]
     dates = df['trade_date'].tolist()
     dates = [date[:4] + '-' + date[4:6] + '-' + date[6:] for date in dates]
     mos_list = []
@@ -665,18 +693,26 @@ def draw_stock_up_to_down_value_figure(
     ax2.yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )
-    # 显示ax2最后一个柱状图的数值
-    ax2.text(
-        dates[-1], up_value[-1], f"{up_value[-1]:.2%}", ha='center', va='bottom', fontsize=10
+    # 显示ax1, ax2最后一个位置的数值
+    ax1.text(
+        dates[-1], close[-1], f"最新:{close[-1]:.2f}", ha='center', va='bottom', fontsize=10
     )
     ax2.text(
-        dates[-1], down_value[-1], f"{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
+        dates[-1], up_value[-1], f"最新:{up_value[-1]:.2%}", ha='center', va='top', fontsize=10
+    )
+    ax2.text(
+        dates[-1], down_value[-1], f"最新:{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
+    )
+    # 以down_value_target画一条红色水平线,在水平线中间位置标注金额
+    ax2.axhline(y=down_value_target, color='r', linestyle='--')
+    ax2.text(
+        dates[len(dates)//2], down_value_target, f"目标:{down_value_target:.2%}", ha='center', va='bottom', fontsize=10
     )
     # 以down_value中最小值画一条红色水平线,在水平线最右边位置标注金额
     min_down_value = min(down_value)
     ax2.axhline(y=min_down_value, color='r', linestyle='--')
     ax2.text(
-        dates[-1], min_down_value, f"{min_down_value:.2%}", ha='center', va='top', fontsize=10
+        dates[len(dates)//2], min_down_value, f"最低:{min_down_value:.2%}", ha='center', va='top', fontsize=10
     )
     ax1.grid(True)
     fig = plt.gcf()
@@ -685,9 +721,10 @@ def draw_stock_up_to_down_value_figure(
     # 保存图形
     if not os.path.exists(dest):
         os.mkdir(dest)
-    existed_files = [file for file in os.listdir(dest) if file.startswith(code)]
-    for file in existed_files:
-        os.remove(os.path.join(dest, file))
+    if remove_existed_img:
+        existed_files = [file for file in os.listdir(dest) if file.startswith(code)]
+        for file in existed_files:
+            os.remove(os.path.join(dest, file))
     file_name = f"{code}-{name}-{dates[0].replace('-', '')}-{dates[-1].replace('-', '')}.pdf"
     dest_file = os.path.join(dest, file_name)
     plt.savefig(dest_file)
