@@ -51,12 +51,12 @@ NEW_TABLE_MONTH = 5  # 新年度表格生成月份
 IMAC_REPOSITORY_PATH = "/Users/zhangrongluo/Desktop/pythonzone/win-stock-conditions/win-stock-conditions"
 
 # 策略参数
-STRATEGIES = ['ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD']
+STRATEGIES = ['ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD', 'ROE']  # 策略名称
 MOS_STEP = 0.25  # MOS步长
 TRADE_MONTH = list(range(5, 13))  # 交易月份
 HOLDING_TIME = [4, 6, 12]  # 每个时间组持有时间(月)
 MAX_NUMBERS = 15  # 全部时间组最大平均股票数量
-ROE_LIST = [8, 24]  # ROE范围
+ROE_LIST = [6, 40]  # ROE范围
 MOS_RANGE = [-1, 1]  # MOS范围
 DV_LIST = [0, 10]  # 股息率范围
 COVER_YEARS = 1  # 重新测试时向前覆盖年数

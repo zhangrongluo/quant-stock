@@ -992,7 +992,7 @@ if __name__ == "__main__":
         print('+ ROE ROE-DIVIDEND ROE-MOS ROE-MOS-DIVIDEND ROE-MOS-MULTI-YIELD QUIT  +')
         print('+                                                                     +')
         print('+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+')
-        msg = input('>>>> 请选择操作提示 <<<< ')
+        msg = input('>>>> 请选择操作提示 <<<< ').strip()
         if msg.upper() == 'ROE':
             while True:
                 try:

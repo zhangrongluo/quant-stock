@@ -496,6 +496,8 @@ def draw_index_up_and_down_value_figure(
     end_date : str = "",
     years_offset: int = 7,
     months_offset: int = 0,
+    show_notions: bool = True,
+    notion_nums: int = 3,
     down_value_target: float = -0.25,
     dset: str = INDEX_UP_DOWN_IMG,
     remove_existed_img: bool = True,
@@ -509,6 +511,8 @@ def draw_index_up_and_down_value_figure(
     :param end_date: 结束日期, 例如: '2019-01-01',默认为空字符串取值为today
     :param years_offset: 绘制的年份向前偏移量
     :param months_offset: 绘制的月份向前偏移量
+    :param show_notions: 是否显示notions
+    :param notion_nums: 显示的最低down_value的数量
     :param down_value_target: 指定的下跌幅度目标
     :param dset: 图形保存目录
     :param remove_existed_img: 是否删除已存在的图形文件
@@ -556,7 +560,7 @@ def draw_index_up_and_down_value_figure(
     plt.rcParams['font.sans-serif'] = ['Songti SC']
     fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
-    dates = dates[::-1]
+    dates = [date.replace('-', '') for date in dates][::-1]
     close = df['close'].tolist()[::-1]
     up_value = df['up_value'].tolist()[::-1]
     down_value = df['down_value'].tolist()[::-1]
@@ -574,15 +578,12 @@ def draw_index_up_and_down_value_figure(
     ax2.yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )
-    # 显示ax1,ax2最后一个位置的数值
+    # 显示ax1最后一个位置的数值
+    notion = f"""C:{close[-1]:.2f}
+    D:{down_value[-1]:.2%} U:{up_value[-1]:.2%}
+    """
     ax1.text(
-        dates[-1], close[-1], f"最新:{close[-1]:.2f}", ha='center', va='bottom', fontsize=10
-    )
-    ax2.text(
-        dates[-1], up_value[-1], f"最新:{up_value[-1]:.2%}", ha='center', va='bottom', fontsize=10
-    )
-    ax2.text(
-        dates[-1], down_value[-1], f"最新:{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
+        dates[-1], close[-1], notion, ha='center', va='bottom', fontsize=10
     )
     # 以down_value_target画一条红色水平线,在水平线中间位置标注金额
     ax2.axhline(y=down_value_target, color='r', linestyle='--')
@@ -599,6 +600,51 @@ def draw_index_up_and_down_value_figure(
     fig = plt.gcf()
     fig.set_size_inches(16, 10)
     plt.legend(loc='upper left')
+    if show_notions:
+        # 显示down_value最低值(不同年份的最低值)
+        tmp_df = df.sort_values(by='down_value', ascending=True)
+        tmp_res = {
+            "year":[], "date":[], "down_value":[], "close":[], "up_value":[], "mos":[]
+        }
+        for idx, row in tmp_df.iterrows():
+            if len(tmp_res["date"]) >= notion_nums:
+                break
+            year = row['trade_date'][0:4]
+            if year not in tmp_res["year"]:  # 不同年份的最低值
+                tmp_res["year"].append(year)
+                tmp_res["date"].append(row['trade_date'])
+                tmp_res["down_value"].append(row['down_value'])
+                tmp_res["close"].append(row['close'])
+                tmp_res["up_value"].append(row['up_value'])
+                tmp_res["mos"].append(row['mos'])
+                notion = f"""{row['trade_date']}:
+                C:{row['close']:.2f} D:{row['down_value']:.2%} U:{row['up_value']:.2%}
+                """
+                ax1.text(
+                    row['trade_date'], row['close'], notion, ha='center', va='bottom', fontsize=8
+                )
+        # 显示up_value最高值(不同年份的最高值)
+        tmp_df = df.sort_values(by='up_value', ascending=False)
+        tmp_res = {
+            "year":[], "date":[], "down_value":[], "close":[], "up_value":[], "mos":[]
+        }
+        for idx, row in tmp_df.iterrows():
+            if len(tmp_res["date"]) >= notion_nums:
+                break
+            year = row['trade_date'][0:4]
+            if year not in tmp_res["year"]:
+                tmp_res["year"].append(year)
+                tmp_res["date"].append(row['trade_date'])
+                tmp_res["down_value"].append(row['down_value'])
+                tmp_res["close"].append(row['close'])
+                tmp_res["up_value"].append(row['up_value'])
+                tmp_res["mos"].append(row['mos'])
+                notion = f"""{row['trade_date']}:
+                C:{row['close']:.2f} D:{row['down_value']:.2%} U:{row['up_value']:.2%}
+                """
+                ax1.text(
+                    row['trade_date'], row['close'], notion, ha='center', va='top', fontsize=8
+                )
     # 保存图形
     if not os.path.exists(dset):
         os.mkdir(dset)
@@ -618,6 +664,8 @@ def draw_stock_up_and_down_value_figure(
     end_date: str = "",
     years_offset: int = 7,
     months_offset: int = 0,
+    show_notions: bool = True,
+    notion_nums: int = 3,
     down_value_target: float = -0.30,
     dest: str = STOCK_UP_DOWN_IMG,
     remove_existed_img: bool = True,
@@ -631,6 +679,8 @@ def draw_stock_up_and_down_value_figure(
     :param start_date: 开始日期, 例如: '2019-01-01'
     :param years_offset: 绘制的年份向前偏移量
     :param months_offset: 绘制的月份向前偏移量
+    :param show_notions: 是否显示notions
+    :param notion_nums: 显示的最低down_value的数量
     :param down_value_target: 指定的下跌幅度目标
     :param dest: 图形保存目录
     :param remove_existed_img: 是否删除已存在的图形文件
@@ -675,7 +725,7 @@ def draw_stock_up_and_down_value_figure(
     plt.rcParams['font.sans-serif'] = ['Songti SC']  # 设置中文显示, 但不能显示负号-
     fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
-    dates = dates[::-1]
+    dates = [date.replace('-', '') for date in dates][::-1]
     close = df['close'].tolist()[::-1]
     up_value = df['up_value'].tolist()[::-1]
     down_value = df['down_value'].tolist()[::-1]
@@ -693,15 +743,12 @@ def draw_stock_up_and_down_value_figure(
     ax2.yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )
-    # 显示ax1, ax2最后一个位置的数值
+    # 显示ax1最后一个位置的数值
+    notion = f"""C:{close[-1]:.2f}
+    D:{down_value[-1]:.2%} U:{up_value[-1]:.2%}
+    """
     ax1.text(
-        dates[-1], close[-1], f"最新:{close[-1]:.2f}", ha='center', va='bottom', fontsize=10
-    )
-    ax2.text(
-        dates[-1], up_value[-1], f"最新:{up_value[-1]:.2%}", ha='center', va='top', fontsize=10
-    )
-    ax2.text(
-        dates[-1], down_value[-1], f"最新:{down_value[-1]:.2%}", ha='center', va='top', fontsize=10
+        dates[-1], close[-1], notion, ha='center', va='bottom', fontsize=10
     )
     # 以down_value_target画一条红色水平线,在水平线中间位置标注金额
     ax2.axhline(y=down_value_target, color='r', linestyle='--')
@@ -718,6 +765,51 @@ def draw_stock_up_and_down_value_figure(
     fig = plt.gcf()
     fig.set_size_inches(16, 10)
     plt.legend(loc='upper left')
+    if show_notions:
+        # 显示down_value最低值(不同年份的最低值)
+        tmp_df = df.sort_values(by='down_value', ascending=True)
+        tmp_res = {
+            "year":[], "date":[], "down_value":[], "close":[], "up_value":[], "mos":[]
+        }
+        for idx, row in tmp_df.iterrows():
+            if len(tmp_res["date"]) >= notion_nums:
+                break
+            year = row['trade_date'][0:4]
+            if year not in tmp_res["year"]:
+                tmp_res["year"].append(year)
+                tmp_res["date"].append(row['trade_date'])
+                tmp_res["down_value"].append(row['down_value'])
+                tmp_res["close"].append(row['close'])
+                tmp_res["up_value"].append(row['up_value'])
+                tmp_res["mos"].append(row['mos'])
+                notion = f"""{row['trade_date']}:
+                C:{row['close']:.2f} D:{row['down_value']:.2%} U:{row['up_value']:.2%}
+                """
+                ax1.text(
+                    row['trade_date'], row['close'], notion, ha='center', va='bottom', fontsize=8
+                )
+        # 显示up_value最高值(不同年份的最高值)
+        tmp_df = df.sort_values(by='up_value', ascending=False)
+        tmp_res = {
+            "year":[], "date":[], "down_value":[], "close":[], "up_value":[], "mos":[]
+        }
+        for idx, row in tmp_df.iterrows():
+            if len(tmp_res["date"]) >= notion_nums:
+                break
+            year = row['trade_date'][0:4]
+            if year not in tmp_res["year"]:
+                tmp_res["year"].append(year)
+                tmp_res["date"].append(row['trade_date'])
+                tmp_res["down_value"].append(row['down_value'])
+                tmp_res["close"].append(row['close'])
+                tmp_res["up_value"].append(row['up_value'])
+                tmp_res["mos"].append(row['mos'])
+                notion = f"""{row['trade_date']}:
+                C:{row['close']:.2f} D:{row['down_value']:.2%} U:{row['up_value']:.2%}
+                """
+                ax1.text(
+                    row['trade_date'], row['close'], notion, ha='center', va='top', fontsize=8
+                )
     # 保存图形
     if not os.path.exists(dest):
         os.mkdir(dest)

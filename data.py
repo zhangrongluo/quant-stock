@@ -541,7 +541,7 @@ if __name__ == '__main__':
         print('Create-Index-Value    Sort-Conditions    Check-Integrity ')
         print('Update-Index-Value    Quit                               ')
         print('---------------------------------------------------------')
-        msg = input('>>>> 请选择操作提示 >>>>  ')
+        msg = input('>>>> 请选择操作提示 >>>>  ').strip()
         if msg.upper()  == 'QUIT':
             break
         elif msg.upper() == 'CREATE-TRADE-CSV':
