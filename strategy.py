@@ -45,7 +45,7 @@ class Strategy:
                 tmp =  {
                     'strategy': strategy.upper(), 
                     'test_condition': {
-                        'roe_list': [],  
+                        'roe_list': [roe_value,]*period,  
                         'roe_value': roe_value, 
                         'period': period,
                         'holding_time': random.choice(HOLDING_TIME),
@@ -649,27 +649,14 @@ class Strategy:
         with con:
             sql = f"""select * from '{ROE_TABLE}' """
             df = pd.read_sql_query(sql, con)
-            columns = df.columns
-            del df
-            sw_stocks = sw.get_all_stocks()
-            sw_codes = [item[0] for item in sw_stocks]  # 申万行业分类股票代码集合
+            columns = df.columns.tolist()
             for index, item in enumerate(columns):
                 if index >= 3 and index+period <= len(columns):  # 动态构建查询范围
                     year_list = columns[index: index+period]
-                    suffix = """stockcode, stockname, stockclass, """
-                    for col, year in enumerate(year_list):
-                        if col == len(year_list) -1:
-                            suffix += f"""{year} """
-                        else:
-                            suffix += f"""{year}, """
-
-                    sql = f"""select {suffix} from '{ROE_TABLE}' where """  # 构建查询条件
-                    for col, year in enumerate(year_list):
-                        if col == len(year_list) -1:
-                            sql += f"""{year}>=?"""
-                        else:
-                            sql += f"""{year}>=? and """
-                    res = con.execute(sql, tuple(roe_list)).fetchall()
+                    # 查询index: index+period年度均大于roe_list的股票
+                    df_tmp = df[(df[year_list] >= roe_list).all(axis=1)]
+                    col_tmp = columns[:3] + year_list
+                    res = [tuple(x) for x in df_tmp[col_tmp].values.tolist()]
                     # 检查res股票清单是否在sw行业指数中
                     if trade_month >=10:
                         time_tail = "-" + str(trade_month) + "-" + "01"  # -11-01
@@ -1024,7 +1011,7 @@ if __name__ == "__main__":
             while True:
                 try:
                     trade_month = int(input('>>>> 请输入交易月份(整数型5-12之间, 999999重新选择策略) <<<< '))
-                    if 12 >= trade_month >= 5 or trade_month == 999999:
+                    if trade_month in TRADE_MONTH or trade_month == 999999:
                         break
                 except:
                     ...
@@ -1033,7 +1020,7 @@ if __name__ == "__main__":
             condition =  {
                 'strategy': 'ROE', 
                 'test_condition': {
-                    'roe_list': [],  
+                    'roe_list': [roe_value,]*period,  
                     'roe_value': roe_value,
                     'period': period,
                     'holding_time': holding_time,
@@ -1085,7 +1072,7 @@ if __name__ == "__main__":
             while True:
                 try:
                     trade_month = int(input('>>>> 请输入交易月份(整数型5-12之间, 999999重新选择策略) <<<< '))
-                    if 12 >= trade_month >= 5 or trade_month == 999999:
+                    if trade_month in TRADE_MONTH or trade_month == 999999:
                         break
                 except:
                     ...
@@ -1143,7 +1130,7 @@ if __name__ == "__main__":
             while True:
                 try:
                     trade_month = int(input('>>>> 请输入交易月份(整数型5-12之间, 999999重新选择策略) <<<< '))
-                    if 12 >= trade_month >= 5 or trade_month == 999999:
+                    if trade_month in TRADE_MONTH or trade_month == 999999:
                         break
                 except:
                     ...
@@ -1209,7 +1196,7 @@ if __name__ == "__main__":
             while True:
                 try:
                     trade_month = int(input('>>>> 请输入交易月份(整数型5-12之间, 999999重新选择策略) <<<< '))
-                    if 12 >= trade_month >= 5 or trade_month == 999999:
+                    if trade_month in TRADE_MONTH or trade_month == 999999:
                         break
                 except:
                     ...
@@ -1276,7 +1263,7 @@ if __name__ == "__main__":
             while True:
                 try:
                     trade_month = int(input('>>>> 请输入交易月份(整数型5-12之间, 999999重新选择策略) <<<< '))
-                    if 12 >= trade_month >= 5 or trade_month == 999999:
+                    if trade_month in TRADE_MONTH or trade_month == 999999:
                         break
                 except:
                     ...

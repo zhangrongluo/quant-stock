@@ -617,8 +617,8 @@ def draw_index_up_and_down_value_figure(
                 tmp_res["close"].append(row['close'])
                 tmp_res["up_value"].append(row['up_value'])
                 tmp_res["mos"].append(row['mos'])
-                notion = f"""{row['trade_date']}:
-                C:{row['close']:.2f} D:{row['down_value']:.2%} U:{row['up_value']:.2%}
+                notion = f"""{row['trade_date']} C:{row['close']:.2f} 
+                D:{row['down_value']:.2%} U:{row['up_value']:.2%}
                 """
                 ax1.text(
                     row['trade_date'], row['close'], notion, ha='center', va='bottom', fontsize=8
@@ -782,8 +782,8 @@ def draw_stock_up_and_down_value_figure(
                 tmp_res["close"].append(row['close'])
                 tmp_res["up_value"].append(row['up_value'])
                 tmp_res["mos"].append(row['mos'])
-                notion = f"""{row['trade_date']}:
-                C:{row['close']:.2f} D:{row['down_value']:.2%} U:{row['up_value']:.2%}
+                notion = f"""{row['trade_date']} C:{row['close']:.2f}
+                D:{row['down_value']:.2%} U:{row['up_value']:.2%}
                 """
                 ax1.text(
                     row['trade_date'], row['close'], notion, ha='center', va='bottom', fontsize=8
