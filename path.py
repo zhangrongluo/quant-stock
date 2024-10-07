@@ -47,8 +47,9 @@ ROE_TABLE = "indicators"  # indicator-roe-from-1991.sqlite3中的表
 CURVE_TABLE = "curve"  # curve.sqlite3中的表
 NEW_TABLE_MONTH = 5  # 新年度表格生成月份
 
-# iMac本地仓库路径
-IMAC_REPOSITORY_PATH = "/Users/zhangrongluo/Desktop/pythonzone/win-stock-conditions/win-stock-conditions"
+# iMac和MACBOOK仓库路径
+MACBOOK_REPOSITORY_PATH = os.environ["MACBOOK_REPOSITORY_PATH"]
+IMAC_REPOSITORY_PATH = os.environ["IMAC_REPOSITORY_PATH"]
 
 # 策略参数
 STRATEGIES = ['ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD', 'ROE']  # 策略名称
@@ -60,3 +61,8 @@ ROE_LIST = [6, 40]  # ROE范围
 MOS_RANGE = [-1, 1]  # MOS范围
 DV_LIST = [0, 10]  # 股息率范围
 COVER_YEARS = 1  # 重新测试时向前覆盖年数
+
+if __name__ == "__main__":
+    print(f"ROOT_PATH: {ROOT_PATH}")
+    print(f"MACBOOK_REPOSITORY_PATH: {MACBOOK_REPOSITORY_PATH}")
+    print(f"IMAC_REPOSITORY_PATH: {IMAC_REPOSITORY_PATH}")

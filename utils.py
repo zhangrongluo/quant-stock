@@ -166,6 +166,7 @@ def calculate_index_rising_value(code: str, start_date: str, end_date: str) -> f
 def calculate_index_up_and_down_value_by_MOS(
     index: Literal["000300", "399006", "000905"], 
     date: str, 
+    mos: float,
     mos_high: float, 
     mos_low: float,
 ) -> Tuple[float, float]:
@@ -173,6 +174,7 @@ def calculate_index_up_and_down_value_by_MOS(
     根据MOS值计算指定日期潜在上涨幅度和下跌幅度.
     :param index: 指数代码, 例如: '000300', '399006', '000905'
     :param date: 日期, 例如: '2019-01-01'
+    :param mos: MOS值, 例如: 0.50
     :param mos_high: 高点MOS值, 例如: 0.75
     :param mos_low: 低点MOS值, 例如: 0.10
     :return: 返回潜在上涨幅度和下跌幅度
@@ -181,7 +183,6 @@ def calculate_index_up_and_down_value_by_MOS(
     potential_down = ((1-mos_high)-(1-mos)) / (1-mos)=(mos-mos_high) / (1-mos)  # 潜在下跌幅度
     该指标用于判断指数估值风险收益对比情况
     """
-    mos = calculate_index_MOS_from_2006(index, date)
     if mos < mos_low or mos > mos_high:
         raise ValueError("MOS值上下限设置错误")
     potential_up = (mos - mos_low) / (1 - mos)
@@ -191,6 +192,7 @@ def calculate_index_up_and_down_value_by_MOS(
 def calculate_stock_up_and_down_value_by_MOS(
     code: str,
     date: str,
+    mos: float,
     mos_high: float,
     mos_low: float,
 ) -> Tuple[float, float]:
@@ -198,6 +200,7 @@ def calculate_stock_up_and_down_value_by_MOS(
     计算股票潜在上涨幅度和下跌幅度.
     :param code: 股票代码, 例如: '600000' or '000001'
     :param date: 日期, 例如: '2019-01-01'
+    :param mos: MOS值, 例如: 0.50
     :param mos_high: 高点MOS值, 例如: 0.75
     :param mos_low: 低点MOS值, 例如: 0.10
     :return: 返回潜在上涨幅度和下跌幅度
@@ -206,7 +209,6 @@ def calculate_stock_up_and_down_value_by_MOS(
     potential_down = ((1-mos_high)-(1-mos)) / (1-mos)=(mos-mos_high) / (1-mos)  # 潜在下跌幅度
     该指标用于判断股票估值风险收益对比情况
     """
-    mos = calculate_MOS_7_from_2006(code=code, date=date)
     if mos < mos_low or mos > mos_high:
         raise ValueError("MOS值上下限设置错误")
     potential_up = (mos - mos_low) / (1 - mos)
@@ -547,10 +549,11 @@ def draw_index_up_and_down_value_figure(
         down_list = []
         for date in dates:
             df_ratio = df[df['trade_date'] <= date.replace('-', '')]
+            mos = df_ratio['mos'].tolist()[0]
             mos_high = df_ratio['mos'].max()
             mos_low = df_ratio['mos'].min()
             up_value, down_value = calculate_index_up_and_down_value_by_MOS(
-                index=index, date=date, mos_high=mos_high, mos_low=mos_low
+                index=index, date=date, mos_high=mos_high, mos_low=mos_low, mos=mos
             )
             up_list.append(up_value)
             down_list.append(down_value)
@@ -639,8 +642,8 @@ def draw_index_up_and_down_value_figure(
                 tmp_res["close"].append(row['close'])
                 tmp_res["up_value"].append(row['up_value'])
                 tmp_res["mos"].append(row['mos'])
-                notion = f"""{row['trade_date']}:
-                C:{row['close']:.2f} D:{row['down_value']:.2%} U:{row['up_value']:.2%}
+                notion = f"""{row['trade_date']} C:{row['close']:.2f} 
+                D:{row['down_value']:.2%} U:{row['up_value']:.2%}
                 """
                 ax1.text(
                     row['trade_date'], row['close'], notion, ha='center', va='top', fontsize=8
@@ -714,8 +717,9 @@ def draw_stock_up_and_down_value_figure(
         df_ratio = df[df['trade_date'] <= date.replace('-', '')]
         mos_high = df_ratio['mos'].max()
         mos_low = df_ratio['mos'].min()
+        mos = df_ratio['mos'].tolist()[0]
         up_value, down_value = calculate_stock_up_and_down_value_by_MOS(
-            code=code, date=date, mos_high=mos_high, mos_low=mos_low
+            code=code, date=date, mos_high=mos_high, mos_low=mos_low, mos=mos
         )
         up_list.append(up_value)
         down_list.append(down_value)
@@ -804,8 +808,8 @@ def draw_stock_up_and_down_value_figure(
                 tmp_res["close"].append(row['close'])
                 tmp_res["up_value"].append(row['up_value'])
                 tmp_res["mos"].append(row['mos'])
-                notion = f"""{row['trade_date']}:
-                C:{row['close']:.2f} D:{row['down_value']:.2%} U:{row['up_value']:.2%}
+                notion = f"""{row['trade_date']} C:{row['close']:.2f} 
+                D:{row['down_value']:.2%} U:{row['up_value']:.2%}
                 """
                 ax1.text(
                     row['trade_date'], row['close'], notion, ha='center', va='top', fontsize=8

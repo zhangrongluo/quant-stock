@@ -122,7 +122,7 @@ def draw_index_mos_and_up_down_value_figure():
         indexes = ["000300", "000905", "399006"]
         for index in indexes:
             utils.draw_index_up_and_down_value_figure(
-                index=index, show_figure=False, years_offset=20
+                index=index, show_figure=False, years_offset=20, notion_nums=2
             )
             utils.draw_whole_index_MOS_figure(
                 index=index, show_figure=False

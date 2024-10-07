@@ -539,7 +539,7 @@ if __name__ == '__main__':
         print('Create-Trade-CSV      Create-Curve       Create-Roe-Table')
         print('Update-Trade-CSV      Update-Curve       Update-ROE-Table')
         print('Create-Index-Value    Sort-Conditions    Check-Integrity ')
-        print('Update-Index-Value    Quit                               ')
+        print('Update-Index-Value    Pull-Conditions    Quit            ')
         print('---------------------------------------------------------')
         msg = input('>>>> 请选择操作提示 >>>>  ').strip()
         if msg.upper()  == 'QUIT':
@@ -622,6 +622,17 @@ if __name__ == '__main__':
                 file_name = os.path.join(TEST_CONDITION_PATH, f"conditions-by-mode{mode}.xlsx")
                 df.to_excel(file_name, index=False)
             print('条件表格排序成功.'+ ' '*50)
+        elif msg.upper() == 'PULL-CONDITIONS':
+            import platform
+            if "MacBook" in platform.uname().node:  # 如果是MacBook机器
+                from path import MACBOOK_REPOSITORY_PATH
+                import shutil
+                cwd = os.getcwd()
+                src_file = os.path.join(MACBOOK_REPOSITORY_PATH, "test-condition-quant.sqlite3")
+                os.system(f"cd {MACBOOK_REPOSITORY_PATH} && git pull gitee main")
+                shutil.copyfile(src_file, TEST_CONDITION_SQLITE3)
+                os.system(f"cd {cwd}")
+                print('最新测试条件表格拉取成功.'+ ' '*50)
         elif msg.upper() == 'CHECK-INTEGRITY':
             res = check_stockcodes_integrity()
             if not res["roe_table"] and not res["trade_record_path"]:
