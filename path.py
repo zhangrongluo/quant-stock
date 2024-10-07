@@ -53,7 +53,7 @@ IMAC_REPOSITORY_PATH = os.environ["IMAC_REPOSITORY_PATH"]
 
 # 策略参数
 STRATEGIES = ['ROE-DIVIDEND', 'ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD', 'ROE']  # 策略名称
-MOS_STEP = 0.30  # MOS步长
+MOS_STEP = 0.50  # MOS步长
 TRADE_MONTH = list(range(5, 13))  # 交易月份
 HOLDING_TIME = [3, 4, 6, 12]  # 每个时间组持有时间(月)
 MAX_NUMBERS = 15  # 全部时间组最大平均股票数量

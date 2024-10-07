@@ -20,19 +20,14 @@ class Strategy:
         pass
 
     @staticmethod
-    def generate_ROE_test_conditions(strategy: str, items: int = 10, mos_step: float = MOS_STEP) -> List[Dict]:
+    def generate_ROE_test_conditions(strategy: str, items: int = 10) -> List[Dict]:
         """
         生成测试条件列表,用于测试策略
         :param strategy: 策略名称, 例如: 'roe', 'roe-dividend', 'roe-mos', 'roe-mos-dividend', 'roe-mos-multi-yield'
         :param items: 生成的测试条件数量, 例如: 10
-        :param mos_step: 生成的测试条件中MOS_RANGE的最大步长
         :return: 测试条件列表
         NOTE:
-        roe_value取值范围为[0, 40], 超过win-stock系统预设值[10, 40]
-        period取值范围为[5, 10], 和win-stock系统预设值[5, 10]相同
-        mos_range取值范围为[-1, 1], 超过win-stock系统预设值[0.2, 1],但是step限制为不大于0.25
-        dividend取值范围为[0, 10], 和win-stock系统预设值[0, 10]相同
-        holding_time键20250523日以后新增的,以前的测试条件没有该键名,默认持股时间为12个月
+        holding_time和trade_month键是后新增的,以前的测试条件没有这两个键,默认为12个月和6月.
         """
         if strategy.upper() not in STRATEGIES:
             raise ValueError(f'请检查策略名称是否在列表中({STRATEGIES})')
@@ -58,8 +53,8 @@ class Strategy:
                 roe_value = random.randint(*ROE_LIST)
                 mos_range = [round(random.uniform(*MOS_RANGE), 4) for _ in range(2)]
                 mos_range.sort()
-                if mos_range[1] - mos_range[0] > mos_step:
-                    mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
+                if mos_range[1] - mos_range[0] > MOS_STEP:
+                    mos_range[1] = round(mos_range[0] + MOS_STEP, 4)  # 限制mos_range的最大步长
                 tmp =  {
                     'strategy': strategy.upper(), 
                     'test_condition': {
@@ -92,8 +87,8 @@ class Strategy:
                 roe_value = random.randint(*ROE_LIST)
                 mos_range = [round(random.uniform(*MOS_RANGE), 4) for _ in range(2)]
                 mos_range.sort()
-                if mos_range[1] - mos_range[0] > mos_step:
-                    mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
+                if mos_range[1] - mos_range[0] > MOS_STEP:
+                    mos_range[1] = round(mos_range[0] + MOS_STEP, 4)  # 限制mos_range的最大步长
                 dividend = random.randint(*DV_LIST)
                 tmp =  {
                     'strategy': strategy.upper(),
@@ -112,8 +107,8 @@ class Strategy:
                 roe_value = random.randint(*ROE_LIST)
                 mos_range = [round(random.uniform(*MOS_RANGE), 4) for _ in range(2)]
                 mos_range.sort()
-                if mos_range[1] - mos_range[0] > mos_step:
-                    mos_range[1] = round(mos_range[0] + mos_step, 4)  # 限制mos_range的最大步长
+                if mos_range[1] - mos_range[0] > MOS_STEP:
+                    mos_range[1] = round(mos_range[0] + MOS_STEP, 4)  # 限制mos_range的最大步长
                 multi_list = np.arange(0.5, 3.5, 0.1)  # 倍数列表
                 multi_value = round(np.random.choice(multi_list, 1)[0], 2)
                 tmp = {
@@ -284,6 +279,8 @@ class Strategy:
         evaluate_result['inner_rate'] = round(inner_rate, 4)
         evaluate_result['down_max'] = round(min(rate_list), 4) if valid_groups else 0
         evaluate_result['highest_rate'] = round(max(rate_list), 4) if valid_groups else 0
+        evaluate_result['avg_rate'] = round(np.mean(rate_list), 4) if valid_groups else 0
+        evaluate_result['std_rate'] = round(np.std(rate_list), 4) if valid_groups else 0
 
         # 调用calculate_score_of_test_condition计算综合评分score
         score = self.calculate_score_of_test_condition(
@@ -508,8 +505,7 @@ class Strategy:
         table_name,
         sqlite_file: str = TEST_CONDITION_SQLITE3,
         times: int = 10, 
-        display: bool = False,
-        mos_step: float = MOS_STEP
+        display: bool = False
         ):
         """
         测试回测类的闭环效果,测试对象为随机生成的测试条件
@@ -517,7 +513,6 @@ class Strategy:
         :param sqlite_file: 保存测试结果的sqlite3数据库文件
         :param times: 测试次数
         :param display: 是否显示中间结果
-        :param mos_step: 生成的测试条件中MOS_RANGE的最大步长
         :return: None
         """
         start = time.time()
@@ -527,7 +522,7 @@ class Strategy:
             strategy = random.choice(STRATEGIES)
             items = random.randint(1, 5)
             number += items
-            condition_list = self.generate_ROE_test_conditions(strategy=strategy, items=items, mos_step=mos_step)
+            condition_list = self.generate_ROE_test_conditions(strategy=strategy, items=items)
             if display:
                 print('+'*120)
                 print(condition_list)
@@ -1351,4 +1346,6 @@ if __name__ == "__main__":
             print(f"{'inner_rate':<20}: {evaluate_result['inner_rate']:.2%}")
             print(f"{'down_max':<20}: {evaluate_result['down_max']:.2%}")
             print(f"{'highest_rate':<20}: {evaluate_result['highest_rate']:.2%}")
+            print(f"{'avg_rate':<20}: {evaluate_result['avg_rate']:.2%}")
+            print(f"{'std_rate':<20}: {evaluate_result['std_rate']:.2%}")
             print('++'*50)
