@@ -679,7 +679,7 @@ def draw_stock_up_and_down_value_figure(
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
     则以2006-03-01为最早日期.结束日期为交易记录的最晚日期.
     :param code: 股票代码, 例如: '600000' or '000001'
-    :param start_date: 开始日期, 例如: '2019-01-01'
+    :param end_date: 结束日期, 例如: '2019-01-01',默认为空字符串取值为today
     :param years_offset: 绘制的年份向前偏移量
     :param months_offset: 绘制的月份向前偏移量
     :param show_notions: 是否显示notions

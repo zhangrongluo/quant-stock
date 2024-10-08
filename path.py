@@ -1,6 +1,6 @@
 import os
 import time
-import pandas as pd
+# import pandas as pd
 
 # 内置目录
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
