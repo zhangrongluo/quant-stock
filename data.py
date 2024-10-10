@@ -624,7 +624,7 @@ if __name__ == '__main__':
             print('条件表格排序成功.'+ ' '*50)
         elif msg.upper() == 'PULL-CONDITIONS':
             import platform
-            if "MBP" in platform.uname().node:  # 如果是MacBook机器
+            if "MacBook" in platform.node():  # 如果是MacBook机器
                 from path import MACBOOK_REPOSITORY_PATH
                 import shutil
                 cwd = os.getcwd()

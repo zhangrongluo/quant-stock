@@ -6,7 +6,7 @@ import datetime
 import json
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Literal
 import utils
 import tsswindustry as sw
 from path import (INDICATOR_ROE_FROM_1991, ROE_TABLE, TEST_CONDITION_SQLITE3, STRATEGIES, 
@@ -214,8 +214,8 @@ class Strategy:
             code_list = [item[0][0:6] for item in stocks]  # 不含后缀
             start_date = date.split(":")[1]
             end_date = date.split(":")[2]
-            stock_return = utils.calculate_portfolio_rising_value(code_list, start_date, end_date)  # 获取组合的收益率
-            test_result[date].append(stock_return)
+            daily_return = utils.calculate_portfolio_rising_value(code_list, start_date, end_date)  # 获取组合的收益率
+            test_result[date].append(daily_return)
             if index_list:  # 获取指数的收益率
                 for index in index_list:
                     index_return = utils.calculate_index_rising_value(index, start_date, end_date)
@@ -233,8 +233,9 @@ class Strategy:
         评估方法: 对某个测试结果中每个时间组的组合和指数的收益率对比,并计算该测试结果的内在收益率.
         某个测试结果战胜000300指数的比例为0则basic_ration基本比率为0.如某个结果共10个有效时间组(valid_groups),
         战胜000300指数的次数为8次,则basic_ration为0.8.选股组合的inner_rate内在收益率为各有效时间组组合总收益的复合收益率.
-        down_max为所有有效时间组中最大回测.计算basic_ratio、inner_rate、down_max, highest_rate和score.
-        均使用有效时间组(valid_groups),即该时间组包含的股票数在5至25之间.
+        down_max为所有有效时间组中最大回测.
+        计算basic_ratio,inner_rate,down_max,highest_rate,avg_rate,std_rate和score,均使用有效时间组(valid_groups),
+        即该时间组包含的股票数在5至25之间.
         :param test_condition: 测试条件,结构为{'strategy': 'ROE', 'test_condition': {...}}.
         :param test_result: 测试结果,策略类方法的返回值.
         :param portfolio_test_result: 测试结果和指数的收益对比,test_strategy_portfolio的返回值.
@@ -299,7 +300,7 @@ class Strategy:
         evaluate_result: Dict,
         table_name,
         sqlite_file: str = TEST_CONDITION_SQLITE3,
-        ) -> None:
+    ) -> None:
         """
         如某个结果综合得分超过85分且valid_percent大于35%,则储存该组合的测试条件和相关评估信息到数据库.
         数据库内容:strategy、test_condition、total_groups(总时间组数目)、valid_groups(有效时间组数目)、
@@ -451,7 +452,7 @@ class Strategy:
         table_name,
         sqlite_file: str = TEST_CONDITION_SQLITE3,
         display: bool = False,
-        ):
+    ):
         """
         测试回测类的闭环效果,测试对象为特定的测试条件,测试结果将保存到数据库
         :param condition: 测试条件,字典类型,结构如下:{'strategy': 'ROE', 'test_condition': {...}}
@@ -506,7 +507,7 @@ class Strategy:
         sqlite_file: str = TEST_CONDITION_SQLITE3,
         times: int = 10, 
         display: bool = False
-        ):
+    ):
         """
         测试回测类的闭环效果,测试对象为随机生成的测试条件
         :param table_name: 保存测试结果的sqlite3数据库中的表名
@@ -536,6 +537,56 @@ class Strategy:
         print('+'*120)
         print(f'共测试{number}次，耗时{round(end-start, 4)}秒')
         print(f'平均每次测试耗时{round((end-start)/number, 4)}秒')
+
+    def calculate_condition_total_retrun(
+        self, 
+        condition: Dict, 
+        index: Literal['000300', '399006', '000905'] = '000300'
+    ) -> pd.DataFrame:
+        """
+        计算测试条件的总收益率
+        :param condition: 测试条件:{'strategy': 'ROE', 'test_condition': {...}}
+        :param index: 指数代码,默认为'000300'
+        """
+        strategy = condition['strategy']
+        if strategy == 'ROE':
+            result = self.ROE_only_strategy_backtest_from_1991(**condition['test_condition'])
+        elif strategy == 'ROE-MOS':
+            result = self.ROE_MOS_strategy_backtest_from_1991(**condition['test_condition'])
+        elif strategy == 'ROE-DIVIDEND':
+            result = self.ROE_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
+        elif strategy == 'ROE-MOS-DIVIDEND':
+            result = self.ROE_MOS_DIVIDEND_strategy_backtest_from_1991(**condition['test_condition'])
+        elif strategy == 'ROE-MOS-MULTI-YIELD':
+            result = self.ROE_MOS_MULTI_YIELD_strategy_backtest_from_1991(**condition['test_condition'])
+        # 计算该测试条件的总收益率
+        return_list = []
+        index_return_list = []
+        for date, stocks in result.items():
+            code_list = [item[0][0:6] for item in stocks]
+            start_date = date.split(":")[1]
+            end_date = date.split(":")[2]
+            if 25 >= len(stocks) >= 5:  # 有效时间组
+                tmp = utils.calculate_portfolio_rising_value(
+                    code_list=code_list, start_date=start_date, end_date=end_date
+                )
+                return_list.append(round(tmp, 4))
+            else:  # 无效时间组,不买入,无收益
+                return_list.append(0.0000)
+            tmp = utils.calculate_index_rising_value(
+                code=index, start_date=start_date, end_date=end_date
+            )
+            index_return_list.append(round(tmp, 4))
+        df = pd.DataFrame(return_list, columns=['portfolio_return'], index=result.keys())
+        df['index_return'] = index_return_list
+        df = df.reset_index()
+        df = df.rename(columns={'index': 'date'})
+        df = df.sort_values(by='date', ascending=True)
+        df['portfolio_total_return'] = (df['portfolio_return'] + 1).cumprod()
+        df['index_total_return'] = (df['index_return'] + 1).cumprod()
+        df['portfolio_total_return'] = df['portfolio_total_return'].map(lambda x: round(x, 4))
+        df['index_total_return'] = df['index_total_return'].map(lambda x: round(x, 4))
+        return df
 
     def get_conditions_from_sqlite3(self, src_sqlite3: str, src_table: str) -> List[Dict]:
         """
@@ -616,7 +667,7 @@ class Strategy:
     @staticmethod
     def ROE_only_strategy_backtest_from_1991(
         roe_list:List=[20]*5, roe_value=None, period:int=5, holding_time:int=12, trade_month:int=6
-        ) -> Dict:
+    ) -> Dict:
         """
         带有回测功能的单一ROE选股策略, 从1991年开始回测.筛选过程中使用INDICATOR_ROE_FROM_1991数据库的年度roe数据.
         年度财务指标公布完成是4月30日,为避免信息误差的问题,以此构建组合的时间应该在第二年5月份以后,
@@ -721,7 +772,7 @@ class Strategy:
 
     def ROE_MOS_strategy_backtest_from_1991(
         self, roe_list: List, mos_range: List, holding_time: int = 12, trade_month: int = 6
-        ) -> Dict:
+    ) -> Dict:
         """
         本策略在ROE_only的基础上,对每一时间组的测试结果再通过MOS_7筛选一次.
         roe_list和period: 含义和使用方法和ROE_only_strategy_backtest_from_1991方法相同.
