@@ -6,6 +6,8 @@ import datetime
 import json
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 from typing import List, Dict, Union, Literal
 import utils
 import tsswindustry as sw
@@ -541,12 +543,14 @@ class Strategy:
     def calculate_condition_total_retrun(
         self, 
         condition: Dict, 
-        index: Literal['000300', '399006', '000905'] = '000300'
+        index: Literal['000300', '399006', '000905'] = '000300',
+        draw_return_figure: bool = False
     ) -> pd.DataFrame:
         """
         计算测试条件的总收益率
         :param condition: 测试条件:{'strategy': 'ROE', 'test_condition': {...}}
         :param index: 指数代码,默认为'000300'
+        :param draw_return_figure: 是否绘制收益率图
         """
         strategy = condition['strategy']
         if strategy == 'ROE':
@@ -586,6 +590,42 @@ class Strategy:
         df['index_total_return'] = (df['index_return'] + 1).cumprod()
         df['portfolio_total_return'] = df['portfolio_total_return'].map(lambda x: round(x, 4))
         df['index_total_return'] = df['index_total_return'].map(lambda x: round(x, 4))
+        df['strategy'] = condition['strategy']
+        df['test_condition'] = f"{condition['test_condition']}"
+        # 绘制收益率图
+        if draw_return_figure:
+            ax: Axes
+            fig, ax = plt.subplots(figsize=(12, 6))
+            plt.rcParams['font.sans-serif'] = ['Songti SC']
+            ax.plot(df['date'], df['portfolio_total_return'], label='组合总收益')
+            ax.plot(df['date'], df['index_total_return'], label=f'{index}指数总收益')
+            ax.fill_between(df['date'], df['portfolio_total_return'], 0, color='gray', alpha=0.5)
+            ax.set_title(f'策略组合VS{index}总收益率对比')
+            ax.set_xlabel(f'{condition["strategy"].lower()} : {condition["test_condition"]}')
+            ax.set_ylabel('总收益率')
+            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, loc: f"{round(x*100, 2):}%"))
+            ax.legend()
+            ax.text(
+                df['date'].iloc[-1], df['portfolio_total_return'].iloc[-1],
+                f'{df["portfolio_total_return"].iloc[-1]:.2%}', ha='center', va='bottom'
+            )
+            ax.text(
+                df['date'].iloc[-1], df['index_total_return'].iloc[-1],
+                f'{df["index_total_return"].iloc[-1]:.2%}', ha='center', va='bottom'
+            )
+            # xticks['loc']在10个以内全部显示,11-20个显示总数的一半,21-30个显示总数的1/3,依次类推
+            xticks = {'labels': [], 'loc': []}
+            for date in df['date']:
+                if date[12:16] not in xticks['labels']:
+                    xticks['labels'].append(date[12:16])
+                    xticks['loc'].append(date)
+            if len(xticks['loc']) > 10:
+                step = len(xticks['loc']) // 10 + 1
+                xticks['loc'] = xticks['loc'][::step]
+                xticks['labels'] = xticks['labels'][::step]
+            ax.set_xticks(xticks['loc'], xticks['labels'])
+            ax.grid(True)
+            plt.show()
         return df
 
     def get_conditions_from_sqlite3(self, src_sqlite3: str, src_table: str) -> List[Dict]:

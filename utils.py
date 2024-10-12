@@ -6,6 +6,7 @@ import datetime
 import time
 import random
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 from typing import List, Tuple, Dict, Union, Literal
 import tushare as ts
 import data
@@ -342,10 +343,17 @@ def draw_10y_yield_curve_figure():
     plt.rcParams['font.sans-serif'] = ['Songti SC'] # 设置中文显示
     plt.fill_between(date, value, color='grey', alpha=0.1)
     plt.title(f"10年期国债到期收益率曲线图(自 {date[0]} 到 {date[-1]})")
-    plt.xticks(
-        [date[0], date[len(date)//4], date[len(date)//2], 
-        date[len(date)//4*3], date[-1]]
-    )    # x轴平均显示5个日期
+    # xticks['loc']在10个以内全部显示,11-20个显示总数的一半,21-30个显示总数的1/3,依次类推
+    xticks = {'labels': [], 'loc': []}
+    for item in date:
+        if item[:4] not in xticks['labels']:
+            xticks['labels'].append(item[:4])
+            xticks['loc'].append(item)
+    if len(xticks['loc']) > 10:
+        step = len(xticks['loc']) // 10 + 1
+        xticks['loc'] = xticks['loc'][::step]
+        xticks['labels'] = xticks['labels'][::step]
+    plt.xticks(ticks=xticks['loc'], labels=xticks['labels'])
     plt.gca().yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x, 2)))
     )  # 设置y轴刻度
@@ -396,10 +404,17 @@ def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: b
     name = sw.get_name_and_class_by_code(code)[0]  # 设置标题
     title = f"{code} {name} MOS-7 曲线图 (自 {start_date} 到 {end_date})"
     plt.title(title)
-    plt.xticks(
-        [dates[0], dates[len(dates)//4], dates[len(dates)//2], 
-        dates[len(dates)//4*3], dates[-1]]
-    )  # 设置x轴刻度
+    # xticks['loc']在10个以内全部显示,11-20个显示总数的一半,21-30个显示总数的1/3,依次类推
+    xticks = {'labels': [], 'loc': []}
+    for item in dates:
+        if item[:4] not in xticks['labels']:
+            xticks['labels'].append(item[:4])
+            xticks['loc'].append(item)
+    if len(xticks['loc']) > 10:
+        step = len(xticks['loc']) // 10 + 1
+        xticks['loc'] = xticks['loc'][::step]
+        xticks['labels'] = xticks['labels'][::step]
+    plt.xticks(ticks=xticks['loc'], labels=xticks['labels'])  # 设置x轴刻度
     plt.gca().yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )  # 设置y轴刻度
@@ -457,11 +472,17 @@ def draw_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figu
     plt.fill_between(date_range, mos_list, color='grey', alpha=0.1)
     title = f"{full_code} MOS 曲线图(自 {start} 到 {end}) "
     plt.title(title)
-    plt.xticks(
-        [date_range[0], date_range[len(date_range)//4], 
-        date_range[len(date_range)//2], 
-        date_range[len(date_range)//4*3], date_range[-1]]
-    )  # 设置x轴刻
+    # xticks['loc']在10个以内全部显示,11-20个显示总数的一半,21-30个显示总数的1/3,依次类推
+    xticks = {'labels': [], 'loc': []}
+    for item in date_range:
+        if item[:4] not in xticks['labels']:
+            xticks['labels'].append(item[:4])
+            xticks['loc'].append(item)
+    if len(xticks['loc']) > 10:
+        step = len(xticks['loc']) // 10 + 1
+        xticks['loc'] = xticks['loc'][::step]
+        xticks['labels'] = xticks['labels'][::step]
+    plt.xticks(ticks=xticks['loc'], labels=xticks['labels'])  # 设置x轴刻度
     plt.gca().yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )  # 设置y轴刻度
@@ -561,6 +582,8 @@ def draw_index_up_and_down_value_figure(
         df["down_value"] = down_list
     # 双轴图,左轴为close折线图，右轴为潜在上涨幅度和下跌幅度柱状图
     plt.rcParams['font.sans-serif'] = ['Songti SC']
+    ax1: Axes
+    ax2: Axes
     fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
     dates = [date.replace('-', '') for date in dates][::-1]
@@ -574,10 +597,17 @@ def draw_index_up_and_down_value_figure(
     ax1.set_ylabel(f'{index}指数收盘价', color='g')
     ax2.set_ylabel('潜在上涨幅度和下跌幅度', color='b')
     ax1.set_title(f"{full_code}(指数) 潜在上涨幅度和下跌幅度图(自 {dates[0]} 至 {dates[-1]})")
-    ax1.set_xticks(
-        [dates[0], dates[len(dates)//4], dates[len(dates)//2], 
-        dates[len(dates)//4*3], dates[-1]]
-    )
+    # 设置x轴刻度
+    xticks = {'labels': [], 'loc': []}
+    for item in dates:
+        if item[:4] not in xticks['labels']:
+            xticks['labels'].append(item[:4])
+            xticks['loc'].append(item)
+    if len(xticks['loc']) > 10:
+        step = len(xticks['loc']) // 10 + 1
+        xticks['loc'] = xticks['loc'][::step]
+        xticks['labels'] = xticks['labels'][::step]
+    ax1.set_xticks(xticks['loc'], xticks['labels'])
     ax2.yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )
@@ -726,7 +756,9 @@ def draw_stock_up_and_down_value_figure(
     df["up_value"] = up_list
     df["down_value"] = down_list
     # 绘双轴图,左轴为close折线图，右轴为潜在上涨幅度和下跌幅度柱状图
-    plt.rcParams['font.sans-serif'] = ['Songti SC']  # 设置中文显示, 但不能显示负号-
+    plt.rcParams['font.sans-serif'] = ['Songti SC']  # 设置中文显示
+    ax1: Axes
+    ax2: Axes
     fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
     dates = [date.replace('-', '') for date in dates][::-1]
@@ -740,10 +772,17 @@ def draw_stock_up_and_down_value_figure(
     ax1.set_ylabel(f'{code}股票收盘价', color='g')
     ax2.set_ylabel('潜在上涨幅度和下跌幅度', color='b')
     ax1.set_title(f"{code} {name} 潜在上涨幅度和下跌幅度图(自 {dates[0]} 至 {dates[-1]})")
-    ax1.set_xticks(
-        [dates[0], dates[len(dates)//4], dates[len(dates)//2], 
-        dates[len(dates)//4*3], dates[-1]]
-    )
+    # 设置x轴刻度
+    xticks = {'labels': [], 'loc': []}
+    for item in dates:
+        if item[:4] not in xticks['labels']:
+            xticks['labels'].append(item[:4])
+            xticks['loc'].append(item)
+    if len(xticks['loc']) > 10:
+        step = len(xticks['loc']) // 10 + 1
+        xticks['loc'] = xticks['loc'][::step]
+        xticks['labels'] = xticks['labels'][::step]
+    ax1.set_xticks(xticks['loc'], xticks['labels'])
     ax2.yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, loc: "{:,}%".format(round(x*100, 2)))
     )
@@ -828,7 +867,7 @@ def draw_stock_up_and_down_value_figure(
     if show_figure:
         plt.show()
 
-def get_gaps_statistic_data(code: str, is_index: bool = False) -> Dict[str, List]:
+def get_gaps_statistic_data(code: str, is_index: bool = False) -> pd.DataFrame:
     """ 
     获取股票和指数缺口及回补情况
     :param code: 股票代码, 例如: '600000' or '000001'
@@ -872,7 +911,6 @@ def get_gaps_statistic_data(code: str, is_index: bool = False) -> Dict[str, List
             tmp_df = df[(df['high'] > low)&(df['trade_date'] > date)]
         if not tmp_df.empty:
             tmp_df = tmp_df.sort_values(by='trade_date', ascending=True)
-            close_to_div = df[df['trade_date'] == date]['close'].values[0]
             item.append(tmp_df.iloc[0]['trade_date'])
             item.append(
                 (datetime.datetime.strptime(tmp_df.iloc[0]['trade_date'], '%Y%m%d')
@@ -881,7 +919,9 @@ def get_gaps_statistic_data(code: str, is_index: bool = False) -> Dict[str, List
         else:
             item.append(None)
             item.append(None)
-    return result
+    df = pd.DataFrame(result).T
+    df.columns = ['gap_type', 'recovery_date', 'recovery_days']
+    return df
 
 if __name__ == "__main__":
     res = calculate_stock_rising_value('000333', '2022-06-01', '2023-06-01')
