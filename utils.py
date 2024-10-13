@@ -330,7 +330,7 @@ def get_indicator_in_trade_record(code: str, date: str, fields: str) -> float:
     row = find_closest_row_in_trade_record(code, date)
     return row[fields].values[0]
 
-def draw_10y_yield_curve_figure():
+def plot_10y_yield_curve_figure():
     """
     绘制10年期国债到期收益率曲线图.
     """
@@ -372,7 +372,7 @@ def draw_10y_yield_curve_figure():
     fig.set_size_inches(16, 10)
     plt.show()
 
-def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: bool = True):
+def save_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: bool = False):
     """ 
     绘制完整的MOS_7图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
@@ -385,11 +385,9 @@ def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: b
     csv_file = os.path.join(TRADE_RECORD_PATH, sw_class, f"{code}.csv")
     df = pd.read_csv(csv_file, dtype={'trade_date': str})
     dates = df['trade_date'].tolist()
+    dates = [date for date in dates if date >= '20060301']
     start_date = dates[-1]
     end_date = dates[0]
-    if start_date < '20060301':
-        start_date = '20060301'
-    df = df[df['trade_date'] >= start_date]
     dates = [date[0:4] + '-' + date[4:6] + '-' + date[6:8] for date in dates]
     mos_list = []
     for date in dates:
@@ -443,8 +441,9 @@ def draw_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: b
     print(f"已保存{dest_file}")
     if show_figure:
         plt.show()
+    plt.close()
 
-def draw_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figure: bool = True):
+def save_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figure: bool = False):
     """ 
     绘制完整的MOS图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
@@ -507,14 +506,15 @@ def draw_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figu
         os.remove(os.path.join(dest, file))
     s = start.replace('-', '')
     e = end.replace('-', '')
-    file_name = f"{index}-{s}-{e}.png"
+    file_name = f"{index}-{s}-{e}.pdf"
     dest_file = os.path.join(dest, file_name)
     plt.savefig(dest_file)
     print(f"已保存{dest_file}")
     if show_figure:
         plt.show()
+    plt.close()
 
-def draw_index_up_and_down_value_figure(
+def save_index_up_and_down_value_figure(
     index: str,
     end_date : str = "",
     years_offset: int = 7,
@@ -524,7 +524,7 @@ def draw_index_up_and_down_value_figure(
     down_value_target: float = -0.25,
     dset: str = INDEX_UP_DOWN_IMG,
     remove_existed_img: bool = True,
-    show_figure: bool = True
+    show_figure: bool = False
 ):
     """
     绘制完整的潜在上涨幅度和下跌幅度图形保存到指定目录.
@@ -691,8 +691,9 @@ def draw_index_up_and_down_value_figure(
     print(f"已保存{dest_file}")
     if show_figure:
         plt.show()
+    plt.close()
 
-def draw_stock_up_and_down_value_figure(
+def save_stock_up_and_down_value_figure(
     code: str,
     end_date: str = "",
     years_offset: int = 7,
@@ -702,7 +703,7 @@ def draw_stock_up_and_down_value_figure(
     down_value_target: float = -0.30,
     dest: str = STOCK_UP_DOWN_IMG,
     remove_existed_img: bool = True,
-    show_figure: bool = True
+    show_figure: bool = False
 ):
     """
     绘制股票潜在上涨幅度和下跌幅度图形.
@@ -866,6 +867,7 @@ def draw_stock_up_and_down_value_figure(
     print(f"已保存{dest_file}")
     if show_figure:
         plt.show()
+    plt.close()
 
 def get_gaps_statistic_data(code: str, is_index: bool = False) -> pd.DataFrame:
     """ 

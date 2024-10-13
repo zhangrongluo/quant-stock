@@ -53,15 +53,17 @@ def get_whole_trade_record_data(code: str) -> pd.DataFrame:
         "dv_ratio", "dv_ttm", "turnover_rate", "turnover_rate_f", "volume_ratio",
         "total_share", "float_share", "free_share", "total_mv", "circ_mv", "pe", "ps"]
     result = pro.daily_basic(ts_code=full_code, fields=fields)
+    # qfq close replace close
+    df = ts.pro_bar(ts_code=full_code, adj='qfq')
+    df = df[['trade_date', 'close']]
+    result = result.drop(columns='close')
+    result = pd.merge(result, df, on='trade_date', how='left')
     tmp = sw.get_name_and_class_by_code(code=code)  # 插入公司简称和行业分类
     result.insert(2, 'company', tmp[0])
     result.insert(3, 'industry', tmp[1])
     # 获取历史涨幅，以trade_date为索引，合并到result中
     tmp = pro.daily(ts_code=full_code, fields='trade_date,pct_chg')
-    tmp = tmp.set_index('trade_date')
-    result = result.set_index('trade_date')
-    result = result.join(tmp, how='inner')
-    result.reset_index(inplace=True)
+    result = pd.merge(result, tmp, on='trade_date', how='left')
     return result
 
 def get_ROE_indicators_from_Tushare(code: str) -> Dict:
@@ -448,15 +450,17 @@ def update_trade_record_csv(code: str):
     "dv_ratio", "dv_ttm", "turnover_rate", "turnover_rate_f", "volume_ratio",
     "total_share", "float_share", "free_share", "total_mv", "circ_mv", "pe", "ps"]
     df1 = pro.daily_basic(ts_code=full_code, start_date=start_date, end_date=end_date, fields=fields)
+    # qfq close replace close
+    df2 = ts.pro_bar(ts_code=full_code, adj='qfq', start_date=start_date, end_date=end_date)
+    df2 = df2[['trade_date', 'close']]
+    df1 = df1.drop(columns='close')
+    df1 = pd.merge(df1, df2, on='trade_date', how='left')
     # 获取历史涨幅，以trade_date为索引，合并到df1中
     tmp = pro.daily(
         ts_code=full_code, start_date=start_date, end_date=end_date, 
         fields='trade_date,pct_chg'
-        )
-    tmp = tmp.set_index('trade_date')
-    df1 = df1.set_index('trade_date')
-    df1 = df1.join(tmp, how='inner')
-    df1.reset_index(inplace=True)
+    )
+    df1 = pd.merge(df1, tmp, on='trade_date', how='left')
     if df1.empty:
         print(f"{full_code}无可更新数据." + ' '*20 + '\r', end='', flush=True)
         return  # 如果df1为空,则无可更新数据,直接返回
@@ -551,7 +555,7 @@ if __name__ == '__main__':
                 with ThreadPoolExecutor() as pool:
                     pool.map(create_trade_record_csv_table, codes)
                 time.sleep(1.5)
-            print('trade-record csv文件创建成功.'+ ' '*50)
+            print('trade record csv文件创建成功.'+ ' '*50)
         elif msg.upper() == 'CREATE-CURVE':
             print('正在创建curve表格,请稍等...\r', end='', flush=True)
             begin = datetime.date(2006, 3, 1)
@@ -574,7 +578,7 @@ if __name__ == '__main__':
                 with ThreadPoolExecutor() as pool:
                     pool.map(update_trade_record_csv, codes)
                 time.sleep(1.5)
-            print('trade-record csv文件更新成功.'+ ' '*50)
+            print('trade record csv文件更新成功.'+ ' '*50)
         elif msg.upper() == 'UPDATE-CURVE':
             print('正在更新curve表格,请稍等...\r', end='', flush=True)
             update_curve_value_table()
