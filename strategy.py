@@ -260,13 +260,17 @@ class Strategy:
         valid_groups_keys = list(valid_groups.keys())
         evaluate_result['valid_groups_keys'] = valid_groups_keys
 
-        # 计算basic_ratio
+        # 计算basic_ratio和组合收益差
         win_count = 0
-        for date, stocks in valid_groups.items():
+        delta_rate = []
+        for date, stocks in sorted(valid_groups.items(), key=lambda x: x[0]):
             if portfolio_test_result[date][0] > portfolio_test_result[date][1]:
                 win_count += 1
+            tmp = round(portfolio_test_result[date][0] - portfolio_test_result[date][1], 4)
+            delta_rate.append(tmp)
         basic_ratio = win_count / len(valid_groups) if valid_groups else 0
         evaluate_result['basic_ratio'] = round(basic_ratio, 4)
+        evaluate_result['delta_rate'] = delta_rate
 
         # 计算inner_rate 和 down_max,inner_rate为有效时间组内在年化收益率,down_max为有效时间组单期最大回撤
         rate_list = []
@@ -614,10 +618,11 @@ class Strategy:
                 f'{df["index_total_return"].iloc[-1]:.2%}', ha='center', va='bottom'
             )
             # xticks['loc']在10个以内全部显示,11-20个显示总数的一半,21-30个显示总数的1/3,依次类推
-            xticks = {'labels': [], 'loc': []}
+            xticks = {'labels': [], 'loc': [], 'year': []}
             for date in df['date']:
-                if date[12:16] not in xticks['labels']:
-                    xticks['labels'].append(date[12:16])
+                if date[12:16] not in xticks['year']:
+                    xticks['year'].append(date[12:16])
+                    xticks['labels'].append(date[12:19].replace('-', ''))  # 显示yyyymm
                     xticks['loc'].append(date)
             if len(xticks['loc']) > 10:
                 step = len(xticks['loc']) // 10 + 1
@@ -1439,4 +1444,7 @@ if __name__ == "__main__":
             print(f"{'highest_rate':<20}: {evaluate_result['highest_rate']:.2%}")
             print(f"{'avg_rate':<20}: {evaluate_result['avg_rate']:.2%}")
             print(f"{'std_rate':<20}: {evaluate_result['std_rate']:.2%}")
+            print(f"{'delta_rate_min':<20}: {min(evaluate_result['delta_rate']):.2%}")
+            print(f"{'delta_rate_max':<20}: {max(evaluate_result['delta_rate']):.2%}")
+            print(f"{'delte_rate_now':<20}: {evaluate_result['delta_rate'][-1]:.2%}")
             print('++'*50)

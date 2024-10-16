@@ -320,15 +320,16 @@ def find_closest_row_in_curve_table(date: str):
         match_row = df.iloc[0:1, :]
     return match_row
 
-def get_indicator_in_trade_record(code: str, date: str, fields: str) -> float:
+def get_indicator_in_trade_record(code: str, date: str, indicator: str) -> float:
     """
     获取指定股票指定日期的指定字段值
     :param code: 股票代码, 例如: '600000' or '000001'
     :param date: 日期, 例如: '2019-01-01'
+    :param indicator: 指标字段, 例如: 'pb', 'pe', 'dv_ttm', 'dv_ratio', 'circ_mv'
     :return: 指定字段的值
     """
     row = find_closest_row_in_trade_record(code, date)
-    return row[fields].values[0]
+    return row[indicator].values[0]
 
 def plot_10y_yield_curve_figure():
     """
