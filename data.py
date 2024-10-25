@@ -386,7 +386,7 @@ def update_ROE_indicators_table_from_1991(code: str):
     :params code: 股票代码, 例如: '600000' or '000001'
     :return: None
     NOTE:
-    当然也可以每年5月份之后重新执行一遍create_ROE_indicators_table_from_1991函数,只是比较耗时.
+    1-4月份更新至前两年的年度ROE,5-12月份更新至前一年的年度ROE
     """
     # 根据日历时间获得需要插入的最新字段名,按照以下规则确定(假设现年份为2023年):
     today = datetime.date.today()

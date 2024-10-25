@@ -27,7 +27,7 @@ import platform
 semaphore = threading.Semaphore(5)
 scheduler = BackgroundScheduler()
 thread = threading.Thread(target=auto_test)
-codes = [item[0][0:6] for item in sw.get_all_stocks()]
+# codes = [item[0][0:6] for item in sw.get_all_stocks()]
 
 def is_trade_day(func):
     """
@@ -49,8 +49,8 @@ def is_trade_day(func):
             pass
     return wrapper
 
-# 每日上午6点开始检查文件和数据完整性
-@scheduler.scheduled_job('cron', hour=6, minute=0, misfire_grace_time=600)
+# 每日下午6点25开始检查文件和数据完整性
+@scheduler.scheduled_job('cron', hour=18, minute=25, misfire_grace_time=600)
 def check_integrity():
     with semaphore:
         res = data.check_stockcodes_integrity()
@@ -81,6 +81,8 @@ def check_integrity():
                     sql = f""" DELETE FROM '{ROE_TABLE}' WHERE stockcode=? """
                     con.execute(sql, (code,))
             print("ROE_TABLE中多余的股票代码已删除."+" "*50)
+        codes = [item[0][0:6] for item in sw.get_all_stocks()]
+        print(f"当前申万行业股票代码数量:{len(codes)}")
 
 # 每日下午8点0分开始更新一次trade record csv文件
 @scheduler.scheduled_job('cron', hour=20, minute=0, misfire_grace_time=3600)
@@ -88,6 +90,7 @@ def check_integrity():
 def update_trade_record_csv():
     with semaphore:
         print('开始更新trade record csv文件\r', end='', flush=True)
+        codes = [item[0][0:6] for item in sw.get_all_stocks()]
         for index in range(0, len(codes), 20):
             stocks = codes[index:index+20]
             with ThreadPoolExecutor() as executor:
@@ -114,7 +117,7 @@ def update_index_value_sqlite3():
             data.update_index_indicator_table(index)
         print('更新index_value.sqlite3完成.' + ' '*20, flush=True)
 
-# 每周五下午6点30分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
+# 每天下午6点35分将TEST_CONDITION_SQLITE3拷贝到本地仓库,更名为test-condition-quant.sqlite3
 # 然后推送到gitee main分支. 本地仓库路径IMAC_REPOSITORY_PATH
 @scheduler.scheduled_job('cron',  hour=18, minute=35, misfire_grace_time=600)
 def copy_test_condition_sqlite3():
@@ -135,6 +138,7 @@ def copy_test_condition_sqlite3():
 def update_indicator_roe_from_1991():
     with semaphore:
         print('开始更新indicator-roe-from-1991.sqlite3\r', end='', flush=True)
+        codes = [item[0][0:6] for item in sw.get_all_stocks()]
         for index in range(0, len(codes), 20):
             stocks = codes[index:index+20]
             with ThreadPoolExecutor(max_workers=8) as executor:

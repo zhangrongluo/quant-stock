@@ -1414,8 +1414,11 @@ if __name__ == "__main__":
             end_date = key.split(':')[2]
             res = utils.calculate_portfolio_rising_value(stock_codes, start_date, end_date)
             print('该组合在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
-            res = utils.calculate_index_rising_value('000300', start_date, end_date)
-            print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res*100))
+            res1 = utils.calculate_index_rising_value('000300', start_date, end_date)
+            print('沪深300在{}到{}期间的收益为{:.2f}%'.format(start_date, end_date, res1*100))
+            if 25 >= len(stock_codes) >= 5:
+                res = round(res-res1, 4)
+                print('该组合相对沪深300的超额收益为{:.2f}%'.format(res*100))
             print('--'*50)
         
         strategy = condition['strategy']
