@@ -77,7 +77,10 @@ def calculate_MOS_7_from_2006(code: str, date: str) -> float:
     mos_7 = 1 -pb/inner_pb
     return round(mos_7, 4)
 
-def calculate_index_MOS_from_2006(index: str, date: str) -> float:
+def calculate_index_MOS_from_2006(
+    index: Literal["000300", "399006", "000905"], 
+    date: str
+) -> float:
     """ 
     计算000300 399006 000905指数的MOS值
     :param index: 指数代码'000300', '399006', '000905'
@@ -128,10 +131,14 @@ def calculate_index_MOS_from_2006(index: str, date: str) -> float:
     mos = 1 - pb/inner_pb
     return round(mos, 4)
 
-def calculate_index_rising_value(code: str, start_date: str, end_date: str) -> float:
+def calculate_index_rising_value(
+    index: Literal["000300", "399006", "000905"], 
+    start_date: str, 
+    end_date: str
+) -> float:
     """
     计算000300 399006 000905指数期间涨幅
-    :param code: 指数代码, 例如: '000300'
+    :param index: 指数代码, 例如: '000300'
     :param start_date: 开始日期, 例如: '2019-01-01'
     :param end_date: 结束日期, 例如: '2019-01-01'
     :return: 指数的涨幅
@@ -140,16 +147,16 @@ def calculate_index_rising_value(code: str, start_date: str, end_date: str) -> f
     而calculate_stock_rising_value函数则没有这个问题.
     为保持参数输入一致性,统一在两个函数转换日期格式.
     """
-    if code not in ['000300', '399006', '000905']:
+    if index not in ['000300', '399006', '000905']:
         raise ValueError('请检查指数代码是否正确(000300, 399006, 000905)')
     date_regex = re.compile(r"^\d{4}-\d{2}-\d{2}$")  # 日期格式转换
     if date_regex.match(start_date):
         start_date = start_date.replace('-', '')
     if date_regex.match(end_date):
         end_date = end_date.replace('-', '')
-    full_code = f'{code}.SH' if code.startswith('000') else f'{code}.SZ'
+    full_code = f'{index}.SH' if index.startswith('000') else f'{index}.SZ'
     if not os.path.exists(INDEX_VALUE):
-        data.create_index_indicator_table(code)
+        data.create_index_indicator_table(index=index)
     con = sqlite3.connect(INDEX_VALUE)
     with con:
         sql = f"""
@@ -444,7 +451,11 @@ def save_whole_MOS_7_figure(code: str, dest: str = STOCK_MOS_IMG, show_figure: b
         plt.show()
     plt.close()
 
-def save_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figure: bool = False):
+def save_whole_index_MOS_figure(
+    index: Literal["000300", "399006", "000905"],
+    dest: str = INDEX_MOS_IMG, 
+    show_figure: bool = False
+):
     """ 
     绘制完整的MOS图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
@@ -516,7 +527,7 @@ def save_whole_index_MOS_figure(index: str, dest: str = INDEX_MOS_IMG, show_figu
     plt.close()
 
 def save_index_up_and_down_value_figure(
-    index: str,
+    index: Literal["000300", "399006", "000905"],
     end_date : str = "",
     years_offset: int = 7,
     months_offset: int = 0,

@@ -12,7 +12,7 @@ import sqlite3
 import requests
 from io import StringIO
 from functools import partial
-from typing import List, Dict
+from typing import List, Dict, Literal
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import tushare as ts
@@ -195,10 +195,10 @@ def create_curve_value_table(days: int):
         df.drop_duplicates(subset=['date1'], keep='last', inplace=True)
         df.to_sql(name=CURVE_TABLE, con=con, index=False, if_exists='replace')
 
-def create_index_indicator_table(index: str='000300'):
+def create_index_indicator_table(index: Literal["000300", "399006", "000905"] = "000300"):
     """
     创建指数估值数据库,用以计算指数MOS_7
-    :param index: '000300' or '000905' or '399006'
+    :param index: 指数代码
     NOTE:
     数据期间从20040101开始至今日(tushare接口限制)
     数据库名称为INDEX_VALUE,表名为000300.SH, 000905.SH, 399006.SH
@@ -474,10 +474,10 @@ def update_trade_record_csv(code: str):
     df_new.to_csv(csv_file, index=False)  # 保存文件
     print(f"{full_code}历史交易记录文件更新成功." + " "*20 + '\r', end='', flush=True)
 
-def update_index_indicator_table(index: str='000300'):
+def update_index_indicator_table(index: Literal["000300", "399006", "000905"] = "000300"):
     """ 
     更新指数估值数据库,用以计算指数MOS
-    :param index: '000300' or '000905' or '399006'
+    :param index: 指数代码
     NOTE:
     数据期间从20040101开始至今日(tushare接口限制)
     数据库名称为INDEX_VALUE,表名为000300.SH, 000905.SH, 399006.SH

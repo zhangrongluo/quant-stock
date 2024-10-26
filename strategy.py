@@ -189,14 +189,14 @@ class Strategy:
         self, 
         strategy: str, 
         result: Dict, 
-        index_list: List = ['000300', '399006', '000905'], 
+        index: Literal['000300', '399006', '000905'] = '000300',
         max_numbers: int = MAX_NUMBERS
     ) -> Union[str, Dict]:
         """
         对选股策略的测试结果进行初步测试,生成该测试结果每个时间组股票组合的收益率和指定指数的收益率,即测试结果和指数的收益对比.
         :param strategy:选股策略名称,支持'ROE-DIVIDEND','ROE-MOS', 'ROE-MOS-DIVIDEND', 'ROE-MOS-MULTI-YIELD'.
         :param result:策略类方法的返回值,即测试条件相对应的测试结果.
-        :param index_list:指定测试的指数,默认为沪深300(000300),创业板指(399006),中证500(000905),最多为3个指数.
+        :param index:指定测试的指数,沪深300(000300),创业板指(399006),中证500(000905).
         :param max_numbers:时间组最大平均选股数量,默认为15.
         :return:返回值为字典,键为时间组(和result参数时间组相同),值为该时间组的选股组合和指定指数的收益率.
         NOTE:
@@ -204,8 +204,6 @@ class Strategy:
         """
         if strategy.upper() not in STRATEGIES:
             raise ValueError(f'请检查策略名称是否在列表中({STRATEGIES})')
-        if not all([item in ['000300', '399006', '000905'] for item in index_list]):
-            raise ValueError('请检查指数代码是否正确')
         test_result = {date: [] for date in result.keys()}  # 定义返回值
 
         if sum([len(item) for item in result.values()])/len(result) > max_numbers:
@@ -218,10 +216,8 @@ class Strategy:
             end_date = date.split(":")[2]
             daily_return = utils.calculate_portfolio_rising_value(code_list, start_date, end_date)  # 获取组合的收益率
             test_result[date].append(daily_return)
-            if index_list:  # 获取指数的收益率
-                for index in index_list:
-                    index_return = utils.calculate_index_rising_value(index, start_date, end_date)
-                    test_result[date].append(index_return)
+            index_return = utils.calculate_index_rising_value(index, start_date, end_date)
+            test_result[date].append(index_return)
         return test_result
 
     def evaluate_portfolio_effect(
@@ -484,7 +480,7 @@ class Strategy:
         
         # 测试该测试结果和指数的收益对比
         portfolio_test_result = self.test_strategy_portfolio(
-            strategy=strategy, result=result, index_list=['000300']
+            strategy=strategy, result=result
         )
         if display:
             print('+'*120)
@@ -547,7 +543,7 @@ class Strategy:
     def calculate_condition_total_retrun(
         self, 
         condition: Dict, 
-        index: Literal['000300', '399006', '000905'] = '000300',
+        index: Literal["000300", "399006", "000905"] = "000300",
         draw_return_figure: bool = False
     ) -> pd.DataFrame:
         """
@@ -582,7 +578,7 @@ class Strategy:
             else:  # 无效时间组,不买入,无收益
                 return_list.append(0.0000)
             tmp = utils.calculate_index_rising_value(
-                code=index, start_date=start_date, end_date=end_date
+                index=index, start_date=start_date, end_date=end_date
             )
             index_return_list.append(round(tmp, 4))
         df = pd.DataFrame(return_list, columns=['portfolio_return'], index=result.keys())
@@ -1425,7 +1421,7 @@ if __name__ == "__main__":
         test_condition = condition['test_condition']
         if strategy in STRATEGIES:
             portfolio_test_result = stockbacktest.test_strategy_portfolio(
-                strategy=strategy, result=tmp_res, index_list=['000300']
+                strategy=strategy, result=tmp_res
             )
             evaluate_result = stockbacktest.evaluate_portfolio_effect(
                 test_condition=condition, 
