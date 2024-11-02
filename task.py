@@ -11,14 +11,11 @@ import os
 import time
 import shutil
 import sqlite3
-import pandas as pd
 import tushare as ts
-import datetime
 from concurrent.futures import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 import tsswindustry as sw
 import data
-import utils
 from test import auto_test
 from path import TEST_CONDITION_SQLITE3, IMAC_REPOSITORY_PATH, INDICATOR_ROE_FROM_1991, ROE_TABLE
 import threading
@@ -68,7 +65,7 @@ def check_integrity():
             diff_codes = res["trade_record_path"].values()
             for codes in diff_codes:
                 with ThreadPoolExecutor() as pool:
-                    pool.map(create_trade_record_csv_table, codes)
+                    pool.map(data.create_trade_record_csv_table, codes)
             print("TRADE_RECORD_PATH目录中缺失的交易信息文件已补齐."+" "*50)
         if res["to_remove"]:
             print("indicator_roe_from_1991.sqlite3文件中多余的股票代码:")

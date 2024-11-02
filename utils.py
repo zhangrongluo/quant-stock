@@ -4,10 +4,9 @@ import sqlite3
 import pandas as pd
 import datetime
 import time
-import random
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from typing import List, Tuple, Dict, Union, Literal
+from typing import List, Tuple, Literal
 import tushare as ts
 import data
 import tsswindustry as sw
@@ -83,7 +82,7 @@ def calculate_index_MOS_from_2006(
 ) -> float:
     """ 
     计算000300 399006 000905指数的MOS值
-    :param index: 指数代码'000300', '399006', '000905'
+    :param index: 指数代码
     :param date: 日期, 例如: '2019-01-01',不早于2006-03-01和记录最早日期的较大者
     :return: 返回MOS值(1年)
     NOTE:
@@ -138,7 +137,7 @@ def calculate_index_rising_value(
 ) -> float:
     """
     计算000300 399006 000905指数期间涨幅
-    :param index: 指数代码, 例如: '000300'
+    :param index: 指数代码
     :param start_date: 开始日期, 例如: '2019-01-01'
     :param end_date: 结束日期, 例如: '2019-01-01'
     :return: 指数的涨幅
@@ -460,7 +459,7 @@ def save_whole_index_MOS_figure(
     绘制完整的MOS图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
     则以2006-03-01为最早日期.结束日期为交易记录的最晚日期.
-    :param index: 指数代码, 例如: '000300', '399006', '000905'
+    :param index: 指数代码
     :param dest: 图形保存目录
     :param show_figure: 是否显示图形
     """
@@ -542,7 +541,7 @@ def save_index_up_and_down_value_figure(
     绘制完整的潜在上涨幅度和下跌幅度图形保存到指定目录.
     开始日期为交易记录最早日期,如果最早日期早于2006-03-01,
     则以2006-03-01为最早日期.结束日期为交易记录的最晚日期.
-    :param index: 指数代码, 例如: '000300', '399006', '000905'
+    :param index: 指数代码
     :param end_date: 结束日期, 例如: '2019-01-01',默认为空字符串取值为today
     :param years_offset: 绘制的年份向前偏移量
     :param months_offset: 绘制的月份向前偏移量
