@@ -5,14 +5,13 @@
 Tushare下载速度比较慢
 """
 import os
-import re
 import time
 import datetime
 import sqlite3
 import requests
 from io import StringIO
 from functools import partial
-from typing import List, Dict, Literal
+from typing import Dict, Literal
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import tushare as ts
@@ -317,8 +316,6 @@ def create_ROE_indicators_table_from_1991(code: str):
     创建1991至上年年度ROE至indicator_roe_from_1991.sqlite3中
     :param code: 股票代码, 例如: '600000' or '000001'
     :return: None
-    NOTE: 
-    被注释的第一行为使用Tushare接口的代码,速度仅为Xueqiu接口20%
     """
     roe_dict = get_ROE_indicators_from_Tushare(code=code)  # 使用tushare接口
     roe_dict = dict(sorted(roe_dict.items(), key=lambda x: x[0], reverse=True))  # 按照键降序排序

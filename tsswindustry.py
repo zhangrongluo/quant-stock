@@ -83,7 +83,6 @@ def get_stocks_of_specific_class(stock_class: str) -> List:
 def get_all_stocks() -> List:
     """
     获取申万指数所有股票代码 公司简称 行业分类
-    :param isnew: 是否最新的申万行业分类数据, 默认为True
     :return: [[股票代码, 公司简称, 行业分类], ...]
     """
     result = DF[['con_code', 'con_name', 'index_name']].values.tolist()

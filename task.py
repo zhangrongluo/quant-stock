@@ -46,41 +46,6 @@ def is_trade_day(func):
             pass
     return wrapper
 
-# 每日下午6点25开始检查文件和数据完整性
-@scheduler.scheduled_job('cron', hour=18, minute=25, misfire_grace_time=600)
-def check_integrity():
-    with semaphore:
-        res = data.check_stockcodes_integrity()
-        if res["roe_table"]:
-            print("indicator_roe_from_1991.sqlite3文件中缺失的股票代码:")
-            print(res["roe_table"])
-            print("开始补齐缺失的数据...")
-            with ThreadPoolExecutor() as pool:
-                pool.map(data.create_ROE_indicators_table_from_1991, res["roe_table"])
-            print("indicator_roe_from_1991.sqlite3文件中缺失的数据已补齐."+" "*50)
-        if res["trade_record_path"]:
-            print("TRADE_RECORD_PATH目录中缺失的股票交易信息代码:")
-            print(res["trade_record_path"])
-            print("开始补齐缺失的交易信息文件...")
-            diff_codes = res["trade_record_path"].values()
-            for codes in diff_codes:
-                with ThreadPoolExecutor() as pool:
-                    pool.map(data.create_trade_record_csv_table, codes)
-            print("TRADE_RECORD_PATH目录中缺失的交易信息文件已补齐."+" "*50)
-        if res["to_remove"]:
-            print("indicator_roe_from_1991.sqlite3文件中多余的股票代码:")
-            print(res["to_remove"])
-            print("开始删除ROE_TABLE中非申万行业的股票清单...")
-            con = sqlite3.connect(INDICATOR_ROE_FROM_1991)
-            with con:
-                for code in res["to_remove"]:
-                    code = code + '.SH' if code.startswith('6') else code + '.SZ'
-                    sql = f""" DELETE FROM '{ROE_TABLE}' WHERE stockcode=? """
-                    con.execute(sql, (code,))
-            print("ROE_TABLE中多余的股票代码已删除."+" "*50)
-        codes = [item[0][0:6] for item in sw.get_all_stocks()]
-        print(f"当前申万行业股票代码数量:{len(codes)}")
-
 # 每日下午8点0分开始更新一次trade record csv文件
 @scheduler.scheduled_job('cron', hour=20, minute=0, misfire_grace_time=3600)
 @is_trade_day
