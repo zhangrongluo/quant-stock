@@ -249,6 +249,7 @@ class Strategy:
 
         # 获取有效时间组
         valid_groups = {date: stocks for date, stocks in test_result.items() if 5 <= len(stocks) <= 25}
+        valid_groups = dict(sorted(valid_groups.items(), key=lambda x: x[0]))
         evaluate_result['valid_groups'] = len(valid_groups)
         evaluate_result['valid_percent'] = round(len(valid_groups) / total_groups, 4)
 
@@ -276,6 +277,7 @@ class Strategy:
         for date, stocks in valid_groups.items():
             total_return *= (1 + portfolio_test_result[date][0])
             rate_list.append(portfolio_test_result[date][0])
+        evaluate_result['rate_list'] = rate_list
         # 将有效时间组的总时长转换为年数，用于计算内在年化收益率
         years = evaluate_result['valid_groups'] * holding_time / 12
         inner_rate = total_return ** (1 / years) - 1 if valid_groups else 0
@@ -1446,4 +1448,21 @@ if __name__ == "__main__":
             print(f"{'delta_rate_min':<20}: {min(evaluate_result['delta_rate']):.2%}")
             print(f"{'delta_rate_max':<20}: {max(evaluate_result['delta_rate']):.2%}")
             print(f"{'delta_rate_last':<20}: {evaluate_result['delta_rate'][-1]:.2%}")
+
+            # 计算持仓比例
+            holding_time = test_condition['holding_time']
+            last_year_rate_list = evaluate_result['rate_list'][-12//holding_time:]
+            last_year_rate_list = [item+1 for item in last_year_rate_list]
+            from functools import reduce
+            last_year_rate = reduce(lambda x, y: x*y, last_year_rate_list)-1
+            holdding_percent = utils.calculate_portfolio_holding_percent(
+                last_year_rate=last_year_rate,
+                inner_rate=evaluate_result['inner_rate'],
+                last_series_rate=evaluate_result['rate_list'][-1],
+                avg_rate=evaluate_result['avg_rate'],
+                std_rate=evaluate_result['std_rate']
+            )
+            print(f"{'last_year_rate':<20}: {last_year_rate:.2%}")
+            print(f"{'last_series_rate':<20}: {evaluate_result['rate_list'][-1]:.2%}")
+            print(f"{'suggested_percent':<20}: {holdding_percent:.2%}")
             print('++'*50)

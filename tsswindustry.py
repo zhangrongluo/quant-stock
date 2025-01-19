@@ -57,6 +57,19 @@ def get_stock_classes() -> List:
     result = DF['index_name'].unique().tolist()
     return result
 
+def get_code_and_class_by_name(name: str, contain_exit: bool=False) -> List:
+    """
+    通过股票简称获取股票代码 公司简称 和行业分类
+    :param name: 股票简称, 例如: '美的集团'或者'美的'
+    :param contain_exit: 是否包含退市股票, 默认为False
+    :return: [[股票代码, 公司简称，行业分类], ...]
+    """
+    tmp = DF.loc[DF['con_name'].str.contains(name)]
+    if not contain_exit:
+        tmp = tmp[~tmp['con_name'].str.contains('退市')]
+    result = tmp[['con_code', 'con_name', 'index_name']].values.tolist()
+    return result
+
 def get_name_and_class_by_code(code: str) -> List:
     """
     通过股票代码获取公司简称及行业分类

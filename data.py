@@ -70,9 +70,13 @@ def get_ROE_indicators_from_Tushare(code: str) -> Dict:
     获取公司1991至上年度年度ROE值,用于初始化indicator_roe_from_1991.sqlite3文件
     :param code: 股票代码, 例如: '600000' or '000001'
     :return: 从1991年上年的字典序列,键值对为年度:ROE
+    NOTE:
+    当前月份是1-4月份,获取前年年度ROE,5-12月份获取上年年度ROE
     """
     start_year = '19911231'
-    end_year = str(time.localtime().tm_year-1)+'1231'
+    year_field = str(time.localtime().tm_year-2) if time.localtime().tm_mon in [1, 2, 3, 4] \
+        else str(time.localtime().tm_year-1)
+    end_year = year_field + '1231'
     periods = pd.date_range(start=start_year, end=end_year, freq='y').strftime("%Y%m%d")
     full_code = code + '.SH' if code.startswith('6') else code + '.SZ'
 

@@ -266,6 +266,59 @@ def calculate_portfolio_rising_value(code_list: List[str], start_date: str, end_
         rate += tmp
     return rate/len(code_list)
 
+
+def calculate_portfolio_holding_percent(
+        last_year_rate, inner_rate,
+        last_series_rate, avg_rate, std_rate
+) -> float:
+    """
+    根据最新一年年化收益化和最新一期序列收益率,计算持仓比例
+    :param last_year_rate: 最新一年年化收益率
+    :param inner_rate: 内在收益率
+    :param last_series_rate: 最新一期序列收益率
+    :param avg_rate: 平均收益率
+    :param std_rate: 收益率标准差
+    NOTE:计算方法如下:
+    1.比较last_year_rate和inner_rate,如果last_year_rate位于(0.8, 1.2(含))inner_rate,
+    则持仓比例为80%,如果位于(1.2, 1.4(含))inner_rate,则持仓比例为60%,如果位于(1.4, 1.6(含))
+    inner_rate,则持仓比例为50%,如果位于(1.6, 2.0(含))inner_rate,则持仓比例为30%,如果位于2.0
+    inner_rate,则持仓比例为20%.如果位于(0.6, 0.8(含))inner_rate,则持仓比例为90%,如果小于0.6,
+    则持仓比例为100%.
+    2.比较last_series_rate位于avg_rate正负1倍标准差之间,则持仓比例为90%,位于avg_rate正2倍标准差
+    以内,则持仓比例为70%,位于avg_rate正3倍标准差以内,则持仓比例为40%,超过avg_rate正3倍标准差,持仓20%.
+    位于avg_rate位于avg_rate负1倍标准差以外,则持仓比例为100%。
+    3.最终持仓比例为上述两个持仓比例的最小值。
+    """
+    # 计算最新一年年化收益率的持仓比例
+    if 0.8*inner_rate <= last_year_rate <= 1.2*inner_rate:
+        holding_percent = 0.8
+    elif 1.2*inner_rate < last_year_rate <= 1.4*inner_rate:
+        holding_percent = 0.6
+    elif 1.4*inner_rate < last_year_rate <= 1.6*inner_rate:
+        holding_percent = 0.5
+    elif 1.6*inner_rate < last_year_rate <= 2.0*inner_rate:
+        holding_percent = 0.3
+    elif last_year_rate > 2.0*inner_rate:
+        holding_percent = 0.2
+    elif 0.6*inner_rate <= last_year_rate < 0.8*inner_rate:
+        holding_percent = 0.9
+    else:
+        holding_percent = 1.0
+    # 计算最新一期序列收益率的持仓比例
+    if avg_rate - std_rate <= last_series_rate <= avg_rate + std_rate:
+        holding_percent_series = 0.9
+    elif avg_rate + std_rate < last_series_rate <= avg_rate + 2*std_rate:
+        holding_percent_series = 0.7
+    elif avg_rate + 2*std_rate < last_series_rate <= avg_rate + 3*std_rate:
+        holding_percent_series = 0.4
+    elif last_series_rate > avg_rate + 3*std_rate:
+        holding_percent_series = 0.2
+    else:
+        holding_percent_series = 1.0
+    # 计算最终持仓比例
+    holding_percent = min(holding_percent, holding_percent_series)
+    return holding_percent
+
 def date_to_stamp(date: str) -> int:
     """
     把yyyy-mm-dd格式的日期转换为13位时间戳
